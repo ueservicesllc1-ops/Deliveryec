@@ -186,20 +186,26 @@ function CheckoutForm() {
   }, [profile]);
 
   const saveOrderToFirestore = async (paymentIntentId?: string) => {
+    let loc = addressCoords;
+    if (!loc && address) {
+      try { loc = await geocode(address); } catch(e) { console.error('Geocode fail:', e); }
+    }
+
     const docRef = await addDoc(collection(db, 'orders'), {
-      customerId:     user!.uid,
-      customerName:   name,
-      customerPhone:  phone,
+      customerId:      user!.uid,
+      customerName:    name,
+      customerPhone:   phone,
       observations,
       restaurantId,
       restaurantName,
       address,
-      items: cart,
+      customerLocation: loc ? { lat: loc[0], lng: loc[1] } : null,
+      items:          cart,
       total,
-      status:         'pending',
+      status:          'pending',
       paymentMethod,
       paymentIntentId: paymentIntentId || null,
-      createdAt:      serverTimestamp(),
+      createdAt:       serverTimestamp(),
     });
     return docRef.id;
   };

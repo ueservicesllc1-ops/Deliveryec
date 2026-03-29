@@ -1,70 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { GoogleMap, useJsApiLoader, OverlayView, DirectionsRenderer } from '@react-google-maps/api';
 import { Bike, MapPin } from 'lucide-react';
-import { renderToStaticMarkup } from 'react-dom/server';
 
-// Fix default Leaflet marker icons
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
-
-// Custom orange driver marker
-const driverIcon = L.divIcon({
-  html: `
-    <div style="
-      width: 44px; height: 44px;
-      background: #FF5722;
-      border-radius: 50% 50% 50% 12%;
-      transform: rotate(-45deg);
-      border: 3px solid white;
-      box-shadow: 0 4px 16px rgba(255,87,34,0.5);
-      display: flex; align-items: center; justify-content: center;
-    ">
-      <div style="transform: rotate(45deg); color: white;">
-        ${renderToStaticMarkup(<Bike size={24} strokeWidth={2.5} />)}
-      </div>
-    </div>
-  `,
-  className: '',
-  iconSize: [44, 44],
-  iconAnchor: [22, 44],
-});
-
-// Custom destination marker
-const destIcon = L.divIcon({
-  html: `
-    <div style="
-      width: 36px; height: 36px;
-      background: white;
-      border-radius: 50%;
-      border: 3px solid #FF5722;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-      display: flex; align-items: center; justify-content: center;
-      color: #FF5722;
-    ">
-      ${renderToStaticMarkup(<MapPin size={20} fill="#FF5722" fillOpacity={0.2} strokeWidth={2.5} />)}
-    </div>
-  `,
-  className: '',
-  iconSize: [36, 36],
-  iconAnchor: [18, 18],
-});
-
-// Auto-pan map to driver position
-function AutoPan({ position }: { position: [number, number] }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(position, map.getZoom(), { animate: true });
-  }, [position, map]);
-  return null;
-}
+const API_KEY = 'AIzaSyC-_aiyna5INqc4ag6_7Uo9zZCahojon2c';
 
 interface LiveMapProps {
   driverPosition: [number, number] | null;
@@ -72,67 +12,192 @@ interface LiveMapProps {
   zoom?: number;
 }
 
+const mapContainerStyle = {
+  width: '100%',
+  height: '100%',
+  borderRadius: 'inherit',
+};
+
+const mapOptions: google.maps.MapOptions = {
+  disableDefaultUI: true,
+  styles: [
+    {
+      "elementType": "geometry",
+      "stylers": [{ "color": "#212121" }]
+    },
+    {
+      "elementType": "labels.icon",
+      "stylers": [{ "visibility": "off" }]
+    },
+    {
+      "elementType": "labels.text.fill",
+      "stylers": [{ "color": "#757575" }]
+    },
+    {
+      "elementType": "labels.text.stroke",
+      "stylers": [{ "color": "#212121" }]
+    },
+    {
+      "featureType": "administrative",
+      "elementType": "geometry",
+      "stylers": [{ "color": "#757575" }]
+    },
+    {
+      "featureType": "poi",
+      "elementType": "geometry",
+      "stylers": [{ "color": "#181818" }]
+    },
+    {
+      "featureType": "road",
+      "elementType": "geometry.fill",
+      "stylers": [{ "color": "#2c2c2c" }]
+    },
+    {
+      "featureType": "water",
+      "elementType": "geometry",
+      "stylers": [{ "color": "#000000" }]
+    }
+  ]
+};
+
 export default function LiveMap({ driverPosition, customerPosition, zoom = 15 }: LiveMapProps) {
-  const [route, setRoute] = useState<[number, number][]>([]);
-  const defaultCenter: [number, number] = driverPosition || [-0.1807, -78.4678];
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: API_KEY
+  });
 
-  // Fetch road route from OSRM
+  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+
+  const onLoad = useCallback((map: google.maps.Map) => {
+    setMap(map);
+  }, []);
+
+  const onUnmount = useCallback(() => {
+    setMap(null);
+  }, []);
+
+  const lastCoords = useRef<{d: string, c: string} | null>(null);
+
+  // Calculate route
   useEffect(() => {
-    if (!driverPosition || !customerPosition) return;
+    if (!isLoaded || !driverPosition || !customerPosition) return;
     
-    const fetchRoute = async () => {
-      try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${driverPosition[1]},${driverPosition[0]};${customerPosition[1]},${customerPosition[0]}?overview=full&geometries=geojson`;
-        const res = await fetch(url);
-        const data = await res.json();
-        if (data.routes && data.routes[0]) {
-          const coords = data.routes[0].geometry.coordinates.map((c: any) => [c[1], c[0]]);
-          setRoute(coords);
-        }
-      } catch (err) {
-        console.error('OSRM Error:', err);
-      }
+    // Avoid redundant calls for minor movements
+    const key = {
+      d: `${driverPosition[0].toFixed(5)},${driverPosition[1].toFixed(5)}`,
+      c: `${customerPosition[0].toFixed(5)},${customerPosition[1].toFixed(5)}`
     };
+    if (lastCoords.current?.d === key.d && lastCoords.current?.c === key.c) return;
+    lastCoords.current = key;
 
-    fetchRoute();
-  }, [driverPosition, customerPosition]);
+    const directionsService = new google.maps.DirectionsService();
+    directionsService.route(
+      {
+        origin: { lat: driverPosition[0], lng: driverPosition[1] },
+        destination: { lat: customerPosition[0], lng: customerPosition[1] },
+        travelMode: google.maps.TravelMode.DRIVING,
+      },
+      (result, status) => {
+        if (status === google.maps.DirectionsStatus.OK) {
+          setDirections(result);
+        } else {
+          setDirections(null);
+          if (status !== 'ZERO_RESULTS') {
+            console.warn(`Directions request failed: ${status}`);
+          }
+        }
+      }
+    );
+  }, [isLoaded, driverPosition, customerPosition]);
+
+  // Center map on driver if no route or if map newly loaded
+  useEffect(() => {
+    if (map && driverPosition && !directions) {
+      map.panTo({ lat: driverPosition[0], lng: driverPosition[1] });
+    }
+  }, [map, driverPosition, directions]);
+
+  if (!isLoaded) return <div style={{ width: '100%', height: '100%', background: '#1a1a1e', borderRadius: 'inherit' }} />;
+
+  const center = driverPosition 
+    ? { lat: driverPosition[0], lng: driverPosition[1] }
+    : { lat: -0.1807, lng: -78.4678 };
 
   return (
-    <MapContainer
-      center={defaultCenter}
+    <GoogleMap
+      mapContainerStyle={mapContainerStyle}
+      center={center}
       zoom={zoom}
-      style={{ width: '100%', height: '100%', borderRadius: 'inherit' }}
-      zoomControl={false}
+      onLoad={onLoad}
+      onUnmount={onUnmount}
+      options={mapOptions}
     >
-      <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; OpenStreetMap'
-      />
-
-      {route.length > 0 && (
-        <Polyline 
-          positions={route} 
-          color="#FF5722" 
-          weight={4} 
-          opacity={0.6} 
-          lineJoin="round" 
+      {directions && (
+        <DirectionsRenderer
+          directions={directions}
+          options={{
+            suppressMarkers: true,
+            polylineOptions: {
+              strokeColor: '#FF5722',
+              strokeOpacity: 0.8,
+              strokeWeight: 6,
+            }
+          }}
         />
       )}
 
+      {/* Driver Marker */}
       {driverPosition && (
-        <>
-          <AutoPan position={driverPosition} />
-          <Marker position={driverPosition} icon={driverIcon}>
-            <Popup>Driver en camino</Popup>
-          </Marker>
-        </>
+        <OverlayView
+          position={{ lat: driverPosition[0], lng: driverPosition[1] }}
+          mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+        >
+          <div style={{
+            position: 'absolute',
+            transform: 'translate(-50%, -100%)',
+          }}>
+            <div style={{
+              width: '44px', height: '44px',
+              background: '#FF5722',
+              borderRadius: '50% 50% 50% 12%',
+              transform: 'rotate(-45deg)',
+              border: '3px solid white',
+              boxShadow: '0 4px 16px rgba(255,87,34,0.5)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <div style={{ transform: 'rotate(45deg)', color: 'white' }}>
+                <Bike size={24} strokeWidth={2.5} />
+              </div>
+            </div>
+          </div>
+        </OverlayView>
       )}
 
+      {/* Destination Marker */}
       {customerPosition && (
-        <Marker position={customerPosition} icon={destIcon}>
-          <Popup>Entrega</Popup>
-        </Marker>
+        <OverlayView
+          position={{ lat: customerPosition[0], lng: customerPosition[1] }}
+          mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+        >
+          <div style={{
+            position: 'absolute',
+            transform: 'translate(-50%, -50%)',
+          }}>
+            <div style={{
+              width: '36px', height: '36px',
+              background: 'white',
+              borderRadius: '50%',
+              border: '3px solid #FF5722',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#FF5722',
+            }}>
+              <MapPin size={20} fill="#FF5722" fillOpacity={0.2} strokeWidth={2.5} />
+            </div>
+          </div>
+        </OverlayView>
       )}
-    </MapContainer>
+    </GoogleMap>
   );
 }

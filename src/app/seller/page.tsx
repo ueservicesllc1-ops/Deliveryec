@@ -20,6 +20,11 @@ import Link from 'next/link';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
+import {
+  STATUS_LABELS, STATUS_COLORS, SELLER_TRANSITIONS, TIMESTAMP_FIELDS,
+  SELLER_ACTIVE_STATUSES, filterBySellerTab, getSellerTab,
+  type OrderStatus, type SellerTab,
+} from '@/lib/orderStateMachine';
 
 const TRANSLATIONS: Record<string, any> = {
   Spanish: {
@@ -45,7 +50,7 @@ const TRANSLATIONS: Record<string, any> = {
 export default function OrderReceptionManager() {
   const { user } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('new');
+  const [activeTab, setActiveTab] = useState<SellerTab>('new');
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [myBusiness, setMyBusiness] = useState<any>(null);
@@ -97,23 +102,31 @@ export default function OrderReceptionManager() {
     return () => { unsub1(); unsub2(); };
   }, [user]);
 
-  const updateStatus = async (id: string, s: string) => { 
-    await updateDoc(doc(db, 'orders', id), { status: s }); 
+  // ── Advance order to the next seller-side state ──
+  const updateStatus = async (id: string, nextStatus: OrderStatus) => {
+    const tsField = TIMESTAMP_FIELDS[nextStatus];
+    await updateDoc(doc(db, 'orders', id), {
+      status: nextStatus,
+      ...(tsField ? { [tsField]: serverTimestamp() } : {}),
+    });
     const order = orders.find(o => o.id === id);
     if (order && order.userId) {
-      let title = ''; let body = '';
-      if (s === 'cooking') { title = '¡Pedido Aceptado! 🧑‍🍳'; body = 'Tu pedido está siendo preparado.'; }
-      else if (s === 'ready') { title = '¡Pedido Listo! 🍔'; body = 'Tu pedido está listo y empacado.'; }
-      else if (s === 'dispatched') { title = '¡En Camino! 🛵'; body = 'Tu pedido ya salió del local y va en camino.'; }
-      
-      if (title) {
+      const pushMap: Partial<Record<OrderStatus, { title: string; body: string }>> = {
+        accepted:         { title: '¡Pedido Aceptado!',       body: 'Tu pedido fue aceptado por el restaurante.' },
+        preparing:        { title: '¡En Cocina!',             body: 'Tu pedido está siendo preparado.' },
+        ready_for_pickup: { title: '¡Pedido Listo!',          body: 'Tu pedido está listo y esperando al repartidor.' },
+        picked_up:        { title: '¡Pedido Recogido!',       body: 'El repartidor recogió tu pedido.' },
+        on_the_way:       { title: '¡En Camino!',             body: 'Tu pedido ya va en camino.' },
+      };
+      const push = pushMap[nextStatus];
+      if (push) {
         try {
           await fetch('/api/push', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: order.userId, title, body, url: `/user/orders` })
+            body: JSON.stringify({ userId: order.userId, ...push, url: '/user/orders' }),
           });
-        } catch (err) { console.warn('Error mandando push:', err); }
+        } catch (err) { console.warn('Push error:', err); }
       }
     }
   };
@@ -151,7 +164,7 @@ export default function OrderReceptionManager() {
   const executeDelete = async () => { if (dishToDelete) { await deleteDoc(doc(db, 'products', dishToDelete.id)); setDishToDelete(null); setActiveMenuId(null); } };
 
   const injectTestOrder = async () => {
-    try { await addDoc(collection(db, 'orders'), { userId: user?.uid, customerName: "Test Order Client", items: [{ name: 'Paradise Burger XXL', quantity: 1, price: 15.50 }, { name: 'Super Wings 12pcs', quantity: 1, price: 12.00 }], total: 27.50, status: 'paid', createdAt: serverTimestamp() }); }
+    try { await addDoc(collection(db, 'orders'), { userId: user?.uid, customerName: "Test Order Client", items: [{ name: 'Paradise Burger XXL', quantity: 1, price: 15.50 }, { name: 'Super Wings 12pcs', quantity: 1, price: 12.00 }], total: 27.50, status: 'created', createdAt: serverTimestamp() }); }
     catch (err) { console.error(err); }
   };
 
@@ -258,13 +271,15 @@ export default function OrderReceptionManager() {
         customerName: 'Cliente Test 🧪',
         phone: '0991234567',
         address: myBusiness.address || 'Av. de las Américas, Guayaquil',
+        location: { lat: -2.1894, lng: -79.8891 }, // Restaurant location
+        customerLocation: { lat: -2.1700, lng: -79.9220 }, // Sample Destination
         restaurantId: myBusiness.userId || user?.uid,
         restaurantName: myBusiness.businessName,
         items: testItems,
         subtotal: subtotal.toFixed(2),
         deliveryFee: deliveryFee.toFixed(2),
         total: (subtotal + deliveryFee).toFixed(2),
-        status: 'paid',
+        status: 'created',
         paymentMethod: 'card',
         createdAt: serverTimestamp(),
         source: 'test',
@@ -276,8 +291,9 @@ export default function OrderReceptionManager() {
     }
   };
 
-  const filteredOrders = orders.filter(o => activeTab === 'all' ? true : activeTab === 'new' ? (!o.status || o.status === 'paid') : (o.status === activeTab || (activeTab === 'history' && o.status === 'dispatched') || (activeTab === 'cancelled' && o.status === 'cancelled')));
-  const tabCount = (s: string) => orders.filter(o => s === 'all' ? true : s === 'new' ? (!o.status || o.status === 'paid') : (s === 'history' ? o.status === 'dispatched' : s === 'cancelled' ? o.status === 'cancelled' : o.status === s)).length;
+  // ── Use state machine for filtering — orders NEVER disappear when driver accepts ──
+  const filteredOrders = filterBySellerTab(orders, activeTab);
+  const tabCount = (tab: SellerTab) => filterBySellerTab(orders, tab).length;
 
   const SELLER_APPS = [
     { id: 'settings',  label: t.apps.settings,   icon: <Settings />,     color: '#71717A' },
@@ -770,20 +786,21 @@ export default function OrderReceptionManager() {
 
       <main style={{ flex: 1, padding: '32px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
-        {/* TOP STATUS BARS */}
+        {/* TOP STATUS BARS — usando nueva máquina de estados */}
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-          {[
-            { id: 'new', label: 'Nuevos pedidos', color: '#F59E0B', icon: <Bell size={24}/>, count: tabCount('new') },
-            { id: 'cooking', label: 'En cocina', color: '#FF6A00', icon: <ChefHat size={24}/>, count: tabCount('cooking') },
-            { id: 'ready', label: 'Pedidos listos', color: '#22C55E', icon: <CheckCircle2 size={24}/>, count: tabCount('ready') },
-            { id: 'history', label: 'Entregados', color: '#8B5CF6', icon: <Archive size={24}/>, count: tabCount('history') },
-            { id: 'cancelled', label: 'Cancelados', color: '#EF4444', icon: <X size={24}/>, count: tabCount('cancelled') }
-          ].map(tab => (
-            <motion.button key={`status-${tab.id}`} onClick={() => setActiveTab(tab.id)} whileHover={{ y: -4, scale: 1.02 }} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 24px', background: tab.color, color: 'white', border: activeTab === tab.id ? '2px solid rgba(255,255,255,0.8)' : '2px solid transparent', borderRadius: '12px', boxShadow: activeTab === tab.id ? `0 15px 30px ${tab.color}80` : '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer', flex: 1, minWidth: '200px', transition: 'all 0.3s', opacity: activeTab === tab.id ? 1 : 0.9, transform: activeTab === tab.id ? 'scale(1.04)' : 'scale(1)' }}>
+          {([
+            { id: 'new' as SellerTab,       label: 'Nuevos',       color: '#F59E0B', icon: <Bell size={24}/> },
+            { id: 'kitchen' as SellerTab,   label: 'En cocina',    color: '#FF6A00', icon: <ChefHat size={24}/> },
+            { id: 'driver' as SellerTab,    label: 'Con driver',   color: '#3B82F6', icon: <Bike size={24}/> },
+            { id: 'history' as SellerTab,   label: 'Entregados',   color: '#8B5CF6', icon: <Archive size={24}/> },
+            { id: 'cancelled' as SellerTab, label: 'Cancelados',   color: '#EF4444', icon: <X size={24}/> },
+          ] as const).map(tab => (
+            <motion.button key={`status-${tab.id}`} onClick={() => setActiveTab(tab.id)} whileHover={{ y: -4, scale: 1.02 }}
+              style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 24px', background: tab.color, color: 'white', border: activeTab === tab.id ? '2px solid rgba(255,255,255,0.8)' : '2px solid transparent', borderRadius: '12px', boxShadow: activeTab === tab.id ? `0 15px 30px ${tab.color}80` : '0 4px 10px rgba(0,0,0,0.1)', cursor: 'pointer', flex: 1, minWidth: '180px', transition: 'all 0.3s' }}>
               <div style={{ background: 'rgba(255,255,255,0.25)', color: 'white', padding: '10px', borderRadius: '8px', backdropFilter: 'blur(4px)' }}>{tab.icon}</div>
               <div style={{ textAlign: 'left' }}>
                 <span style={{ display: 'block', fontSize: '15px', fontWeight: 800 }}>{tab.label}</span>
-                <span style={{ display: 'block', fontSize: '22px', fontWeight: 900 }}>{tab.count}</span>
+                <span style={{ display: 'block', fontSize: '22px', fontWeight: 900 }}>{tabCount(tab.id)}</span>
               </div>
             </motion.button>
           ))}
@@ -797,9 +814,9 @@ export default function OrderReceptionManager() {
           <div>
             <h2 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: 900, color: '#111827' }}>Panel de Pedidos</h2>
             <div style={{ display: 'flex', gap: '24px' }}>
-              {[{id:'all', label:'Todos', count: orders.length}, {id:'new', label:'Pendiente', count:tabCount('new')}, {id:'cooking', label:'En cocina', count:tabCount('cooking')}, {id:'ready', label:'Listo', count:tabCount('ready')}, {id:'history', label:'Entregados', count:tabCount('history')}, {id:'cancelled', label:'Cancelados', count:tabCount('cancelled')}].map(t => (
+              {([{id:'all' as SellerTab, label:'Todos'}, {id:'new' as SellerTab, label:'Nuevos'}, {id:'kitchen' as SellerTab, label:'Cocina'}, {id:'driver' as SellerTab, label:'Con driver'}, {id:'history' as SellerTab, label:'Entregados'}, {id:'cancelled' as SellerTab, label:'Cancelados'}]).map(t => (
                 <button key={`subtab-${t.id}`} onClick={() => setActiveTab(t.id)} style={{ background: 'none', border: 'none', padding: '0 0 8px 0', fontSize: '14px', fontWeight: activeTab === t.id ? 800 : 700, color: activeTab === t.id ? '#111827' : '#6B7280', borderBottom: activeTab === t.id ? '3px solid #FF6A00' : '3px solid transparent', cursor: 'pointer' }}>
-                  {t.label} {t.count > 0 && <span style={{ background: '#F7F7F8', padding: '2px 6px', borderRadius: '12px', fontSize: '11px', color: '#111827' }}>{t.count}</span>}
+                  {t.label} <span style={{ background: '#F7F7F8', padding: '2px 6px', borderRadius: '12px', fontSize: '11px', color: '#111827' }}>{tabCount(t.id)}</span>
                 </button>
               ))}
             </div>
@@ -815,38 +832,67 @@ export default function OrderReceptionManager() {
             {filteredOrders.length === 0 && <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px', color: '#A3AED0', fontWeight: 800 }}><ShoppingBag size={48} style={{ opacity: 0.2, marginBottom: '16px' }} /><br/>No hay pedidos en esta vista</div>}
             
             {filteredOrders.map((order, idx) => {
-              const oColor = order.status === 'cooking' ? '#FF6A00' : order.status === 'ready' ? '#22C55E' : order.status === 'dispatched' ? '#8B5CF6' : order.status === 'cancelled' ? '#EF4444' : '#F59E0B';
-              const oTitle = order.status === 'cooking' ? 'En cocina' : order.status === 'ready' ? 'Listo' : order.status === 'dispatched' ? 'Entregado' : order.status === 'cancelled' ? 'Cancelado' : 'Nuevo';
+              // ── State machine colors and labels ──
+              // ── Normalize legacy Firestore statuses to new state machine ──
+              const rawStatus = order.status || 'created';
+              const oStatus: OrderStatus = (
+                rawStatus === 'paid' || rawStatus === 'new' ? 'created' :
+                rawStatus === 'cooking'    ? 'preparing' :
+                rawStatus === 'ready'      ? 'ready_for_pickup' :
+                rawStatus === 'dispatched' ? 'on_the_way' :
+                rawStatus
+              ) as OrderStatus;
+              const oColor   = STATUS_COLORS[oStatus]  || '#F59E0B';
+              const oTitle   = STATUS_LABELS[oStatus]  || 'Nuevo';
+              const sellerNext = SELLER_TRANSITIONS[oStatus];
               
               return (
-                <motion.div key={`order-${order.id || idx}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
+                <motion.div key={`order-${order.id || idx}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', border: `1px solid ${oColor}22` }}>
                   
                   {/* Card Header Colored */}
                   <div style={{ background: oColor, padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'white' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '15px' }}>
-                      {(order.status === 'ready' || order.status === 'dispatched') && <CheckCircle2 size={18} />}
+                      {['driver_assigned','driver_arrived','picked_up','on_the_way','delivered','completed'].includes(oStatus) && <Bike size={16} />}
+                      {['ready_for_pickup','accepted','preparing'].includes(oStatus) && <ChefHat size={16} />}
                       {oTitle}
                     </div>
-                    {order.status === 'new' && <div style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 800 }}>Pendiente</div>}
-                    <MoreVertical size={18} style={{ opacity: 0.8, cursor: 'pointer' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 800 }}>
+                        #{order.id?.slice(0,6)?.toUpperCase()}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Card Content */}
                   <div style={{ padding: '20px', flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                         <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#F7F7F8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: oColor, fontWeight: 900 }}>
                            {order.customerName ? order.customerName.charAt(0).toUpperCase() : 'C'}
                         </div>
                         <div>
-                          <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 900, color: '#111827' }}>Pedido #{order.id?.slice(0,4)?.toUpperCase() || '0921'}</h4>
-                          <span style={{ fontSize: '13px', color: '#6B7280', fontWeight: 700 }}>{order.customerName || 'Cliente Local'}</span>
+                          <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 900, color: '#111827' }}>{order.customerName || 'Cliente Local'}</h4>
+                          <span style={{ fontSize: '13px', color: '#6B7280', fontWeight: 700 }}>{order.address || ''}</span>
                         </div>
                       </div>
-                      <span style={{ fontSize: '12px', color: '#A7ADB7', fontWeight: 800 }}>hace 5 min</span>
+                      <span style={{ fontSize: '12px', color: '#A7ADB7', fontWeight: 800 }}>
+                        {order.createdAt?.seconds ? new Date(order.createdAt.seconds*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '--'}
+                      </span>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+                    {/* ── DRIVER BADGE — always shown when assigned, NEVER hidden ── */}
+                    {order.assignedDriverId && (
+                      <div style={{ marginBottom: '12px', padding: '10px 14px', background: '#EFF6FF', borderRadius: '10px', border: '1px solid #BFDBFE', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Bike size={14} color="#3B82F6" />
+                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#1E40AF' }}>
+                          Driver: <span style={{ color: '#3B82F6' }}>{order.driverName || order.assignedDriverId}</span>
+                          {order.driverPhone && <span style={{ color: '#6B7280', marginLeft: '8px' }}>· {order.driverPhone}</span>}
+                        </span>
+                        <div style={{ marginLeft: 'auto', width: '8px', height: '8px', borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 6px #22C55E' }} />
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
                       {order.items?.map((item: any, i: number) => (
                         <div key={`item-${i}`} style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '14px', fontWeight: 700, color: '#111827' }}>
                           <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: oColor, flexShrink: 0 }} />
@@ -855,19 +901,28 @@ export default function OrderReceptionManager() {
                       ))}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid #E9EAEC' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '14px', borderTop: '1px solid #E9EAEC' }}>
                       <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: 700 }}>
-                        <span style={{ display: 'block' }}>Paga con:</span>
                         <span style={{ color: '#111827', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <DollarSign size={14} color="#FF6A00" /> {order.total} USD
                         </span>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        {(!order.status || order.status === 'paid' || order.status === 'new') && <button onClick={() => updateStatus(order.id, 'cooking')} style={{ padding: '10px 24px', background: '#FF6A00', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 12px rgba(255,106,0,0.2)' }}>Aceptar</button>}
-                        {order.status === 'cooking' && <button onClick={() => updateStatus(order.id, 'ready')} style={{ padding: '10px 24px', background: '#22C55E', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 12px rgba(34,197,94,0.2)' }}>Listo</button>}
-                        {order.status === 'ready' && <button onClick={() => updateStatus(order.id, 'dispatched')} style={{ padding: '10px 20px', background: '#8B5CF6', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 12px rgba(139,92,246,0.2)' }}>Entregado</button>}
-                        {/* Cancel request — only for active orders without pending request */}
-                        {['paid','cooking','ready'].includes(order.status || 'paid') && !order.cancelRequest && (
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        {/* ── STATE MACHINE: seller can only do specific transitions ── */}
+                        {sellerNext && (
+                          <button
+                            onClick={() => updateStatus(order.id, sellerNext)}
+                            style={{ padding: '10px 20px', background: STATUS_COLORS[sellerNext], color: 'white', border: 'none', borderRadius: '12px', fontWeight: 900, cursor: 'pointer', fontSize: '13px' }}
+                          >
+                            {sellerNext === 'accepted'         ? 'Aceptar' :
+                             sellerNext === 'preparing'        ? 'A cocina' :
+                             sellerNext === 'ready_for_pickup' ? 'Marcar listo' :
+                             sellerNext === 'picked_up'        ? 'Entregar al driver' :
+                             STATUS_LABELS[sellerNext]}
+                          </button>
+                        )}
+                        {/* Cancel request — only for non-terminal active orders */}
+                        {['created','accepted','preparing'].includes(oStatus) && !order.cancelRequest && (
                           <button
                             onClick={() => { setCancelReqOrder(order); setCancelReason('Producto agotado'); setCancelOtherText(''); }}
                             style={{ padding: '10px 14px', background: 'transparent', color: '#EF4444', border: '1px solid #EF444440', borderRadius: '12px', fontWeight: 800, fontSize: '12px', cursor: 'pointer' }}
