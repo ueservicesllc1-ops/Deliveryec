@@ -77,7 +77,7 @@ export default function MyOrdersPage() {
                 <h3 className="text-xl font-black text-[#111] uppercase tracking-tight mb-2">No tienes pedidos aún</h3>
                 <p className="text-gray-400 text-sm font-medium">¡Anímate a realizar tu primera compra!</p>
              </div>
-             <button onClick={() => window.location.href='/app'} className="bg-orange-500 text-white font-black py-4 px-8 rounded-2xl shadow-xl shadow-orange-500/20 hover:scale-105 transition-all text-xs uppercase tracking-widest">
+             <button onClick={() => window.location.href='/order'} className="bg-orange-500 text-white font-black py-4 px-8 rounded-2xl shadow-xl shadow-orange-500/20 hover:scale-105 transition-all text-xs uppercase tracking-widest">
                Ver Restaurantes
              </button>
           </div>
@@ -126,7 +126,7 @@ export default function MyOrdersPage() {
                    <div className="flex items-center gap-3">
                       {ord.status !== 'delivered' && (
                         <Link
-                          href={`/app/track/${ord.id}`}
+                          href={`/order/track/${ord.id}`}
                           className="bg-orange-500 text-white p-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-orange-500/20 hover:bg-orange-600"
                         >
                           <Navigation size={14} /> Seguir

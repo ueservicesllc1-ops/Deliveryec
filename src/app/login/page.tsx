@@ -48,9 +48,9 @@ export default function AuthPage() {
       const userRole = snap.exists() ? snap.data().role : (fallbackRole || 'customer');
       if (userRole === 'driver')     router.push('/driver');
       else if (userRole === 'restaurant') router.push('/portal');
-      else router.push('/app');
+      else router.push('/order');
     } catch {
-      router.push('/app');
+      router.push('/order');
     }
   };
 
@@ -146,9 +146,8 @@ export default function AuthPage() {
         <div style={{ position:'absolute', top:0, left:'20%', right:'20%', height:'2px', background:'linear-gradient(to right, transparent, #FF5722, transparent)', borderRadius:'99px' }} />
 
         {/* Logo */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'12px', marginBottom:'32px' }}>
-          <div style={{ width:'40px', height:'40px', background:'linear-gradient(135deg, #FF6B35, #FF5722)', borderRadius:'12px', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontWeight:900, fontSize:'20px', fontStyle:'italic', boxShadow:'0 4px 20px rgba(255,87,34,0.4)' }}>D</div>
-          <span style={{ fontSize:'22px', fontWeight:900, color:'white', letterSpacing:'-0.5px' }}>Deliveryy</span>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'32px' }}>
+          <img src="/logo.png" style={{ height: '40px', objectFit: 'contain' }} alt="Deliveryy" />
         </div>
 
         {/* Google Button */}

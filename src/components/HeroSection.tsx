@@ -2,6 +2,8 @@
 import { motion } from 'framer-motion';
 import { MapPin, ArrowRight, Clock, Bike, Store } from 'lucide-react';
 import Link from 'next/link';
+import { useState, useRef, useEffect } from 'react';
+import { useLoadScript, Autocomplete } from '@react-google-maps/api';
 
 const stats = [
   { icon: <Clock size={15} />, label: 'Entrega en 25–35 min', sub: 'Promedio en tu zona' },
@@ -9,7 +11,46 @@ const stats = [
   { icon: <Store size={15} />, label: '+2,500 Restaurantes', sub: 'En toda la ciudad' },
 ];
 
+const libraries: any[] = ['places'];
+
 export default function HeroSection() {
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: 'AIzaSyC-_aiyna5INqc4ag6_7Uo9zZCahojon2c',
+    libraries,
+  });
+
+  const [address, setAddress] = useState('');
+  const [userBounds, setUserBounds] = useState<any>(null);
+  const autocompleteRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          setUserBounds({
+            north: lat + 0.1,
+            south: lat - 0.1,
+            east: lng + 0.1,
+            west: lng - 0.1,
+          });
+        },
+        (err) => console.warn('Geolocation error:', err),
+        { timeout: 5000 }
+      );
+    }
+  }, []);
+
+  const handlePlaceChanged = () => {
+    if (autocompleteRef.current) {
+      const place = autocompleteRef.current.getPlace();
+      if (place && place.formatted_address) {
+        setAddress(place.formatted_address);
+      }
+    }
+  };
+
   return (
     <section id="hero" style={{
       background: '#111111',
@@ -166,18 +207,42 @@ export default function HeroSection() {
             }}>
             <div style={{ display: 'flex', alignItems: 'center', flex: 1, padding: '0 16px', gap: '10px' }}>
               <MapPin size={17} color="var(--orange)" style={{ flexShrink: 0 }} />
-              <input
-                type="text"
-                placeholder="Ingresa tu dirección de entrega..."
-                style={{
-                  flex: 1, border: 'none', outline: 'none',
-                  fontSize: '14px', color: 'var(--text-dark)',
-                  padding: '15px 0', background: 'transparent',
-                  fontFamily: 'Inter, sans-serif',
-                }}
-              />
+              {isLoaded ? (
+                <div style={{ flex: 1, width: '100%' }}>
+                  <Autocomplete
+                    onLoad={(auto) => { autocompleteRef.current = auto; }}
+                    onPlaceChanged={handlePlaceChanged}
+                    options={userBounds ? { bounds: userBounds } : {}}
+                  >
+                    <input
+                      type="text"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="Ingresa tu dirección de entrega..."
+                      style={{
+                        width: '100%', border: 'none', outline: 'none',
+                        fontSize: '14px', color: 'var(--text-dark)',
+                        padding: '15px 0', background: 'transparent',
+                        fontFamily: 'Inter, sans-serif',
+                      }}
+                    />
+                  </Autocomplete>
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  placeholder="Cargando mapa..."
+                  disabled
+                  style={{
+                    flex: 1, border: 'none', outline: 'none',
+                    fontSize: '14px', color: 'var(--text-dark)',
+                    padding: '15px 0', background: 'transparent',
+                    fontFamily: 'Inter, sans-serif',
+                  }}
+                />
+              )}
             </div>
-            <Link href="/login" className="btn-orange" style={{ margin: '6px', padding: '11px 22px', borderRadius: '8px', fontSize: '14px', flexShrink: 0, gap: '7px', border: 'none', cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
+            <Link href="/order" className="btn-orange" style={{ margin: '6px', padding: '11px 22px', borderRadius: '8px', fontSize: '14px', flexShrink: 0, gap: '7px', border: 'none', cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
               Buscar Comida <ArrowRight size={15} />
             </Link>
           </motion.div>

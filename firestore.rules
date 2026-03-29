@@ -2,42 +2,26 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // ── USERS & PROFILES ──
-    // Each user can read/write their own profile and user data
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null;
+    
+    // REGLA PARA PEDIDOS
+    match /orders/{orderId} {
+      allow read, write: if request.auth != null;
     }
     
-    match /profiles/{profileId} {
-      allow read, write: if request.auth != null && request.auth.uid == profileId;
-      allow create: if request.auth != null;
-    }
-
-    // ── ORDERS ──
-    match /orders/{orderId} {
-      // Basic rules for orders
-      allow create, read, update: if request.auth != null;
-    }
-
-    // ── RESTAURANTS ──
-    match /restaurants/{restaurantId} {
-      allow read: if true;  // public
+    // REGLA PARA SOLICITUDES DE NEGOCIO (SELLERS)
+    match /business_requests/{requestId} {
+      allow read: if request.auth != null;
       allow write: if request.auth != null;
     }
-
-    // ── DRIVER LOCATIONS ──
-    match /drivers/{driverId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == driverId;
+    
+    // REGLA PARA PRODUCTOS (MENÚ)
+    match /products/{productId} {
+      allow read, write: if request.auth != null;
     }
-
-    // ── BUSINESS REQUESTS ──
-    match /business_requests/{requestId} {
-      allow create: if request.auth != null;
-      allow read, update: if request.auth != null && request.auth.uid == resource.data.userId;
+    
+    // REGLA POR DEFECTO
+    match /{document=**} {
+      allow read, write: if request.auth != null;
     }
-
   }
 }

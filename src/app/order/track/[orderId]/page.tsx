@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db } from '@/lib/firebase';
@@ -28,15 +28,17 @@ const statusIndex: Record<string, number> = {
   pending: 0, cooking: 1, ready: 2, delivered: 3
 };
 
-export default function TrackOrderPage({ params }: { params: { orderId: string } }) {
+export default function TrackOrderPage({ params }: { params: Promise<{ orderId: string }> }) {
+  const unwrappedParams = React.use(params);
+  const orderId = unwrappedParams.orderId;
   const [order, setOrder]               = useState<any>(null);
   const [driverPos, setDriverPos]       = useState<[number,number]|null>(null);
   const [loading, setLoading]           = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    if (!params.orderId) return;
-    const unsub = onSnapshot(doc(db, 'orders', params.orderId), (snap) => {
+    if (!orderId) return;
+    const unsub = onSnapshot(doc(db, 'orders', orderId), (snap) => {
       if (snap.exists()) {
         const data = { id: snap.id, ...snap.data() };
         setOrder(data);
@@ -47,21 +49,28 @@ export default function TrackOrderPage({ params }: { params: { orderId: string }
       setLoading(false);
     });
     return () => unsub();
-  }, [params.orderId]);
+  }, [orderId]);
 
   const currentStep = order ? (statusIndex[order.status] ?? 0) : 0;
 
   return (
     <div style={{
+      width: '100%',
       minHeight: '100dvh',
       background: '#F8F9FA',
       fontFamily: 'Inter, -apple-system, sans-serif',
       display: 'flex',
       flexDirection: 'column',
-      maxWidth: '480px',
-      margin: '0 auto',
       position: 'relative',
     }}>
+      <div style={{
+        maxWidth: '1280px',
+        margin: '0 auto',
+        width: '100%',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
       
       {/* ── HEADER ── */}
       <div style={{ 
@@ -276,6 +285,7 @@ export default function TrackOrderPage({ params }: { params: { orderId: string }
         .animate-spin { animation: spin 1s linear infinite; }
         .leaflet-container { background: #F8F9FA !important; border-radius: 0 0 32px 32px !important; }
       `}</style>
+      </div>
     </div>
   );
 }

@@ -80,18 +80,18 @@ export default function AddressAutocomplete({ onAddressSelect, placeholder, init
   }
 
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
+    <div style={{ position: 'relative', width: '100%', marginBottom: '4px' }}>
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
-        background: '#F5F5F7',
-        borderRadius: '16px',
-        padding: '14px 16px',
-        border: '1px solid #E5E5E5',
+        background: 'white',
+        borderRadius: '12px',
+        padding: '16px 20px',
+        border: '2px solid #F3F4F6',
         transition: 'all 0.2s',
-      }}>
-        <MapPin size={18} color="#FF5722" />
+      }} className="focus-within:border-orange-500 focus-within:ring-4 focus-within:ring-orange-50">
+        <MapPin size={18} color="#FF5722" className="flex-shrink-0" />
         
         {isLoaded ? (
           <Autocomplete 
@@ -100,44 +100,44 @@ export default function AddressAutocomplete({ onAddressSelect, placeholder, init
             options={{
               fields: ["formatted_address", "geometry", "name"],
               types: ["geocode", "establishment"],
-              // Define un área de búsqueda alrededor del usuario (aprox 10-15km)
               bounds: userLocation ? {
                 north: userLocation.lat + 0.1,
                 south: userLocation.lat - 0.1,
                 east: userLocation.lng + 0.1,
                 west: userLocation.lng - 0.1,
               } : undefined,
-              strictBounds: false // No limita solo a esa zona, pero le da prioridad
+              strictBounds: false 
             }}
           >
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={placeholder || 'Escribe tu dirección exacta...'}
+              placeholder={placeholder || 'Escribre tu dirección exacta...'}
               style={{
                 width: '100%',
                 background: 'none',
                 border: 'none',
                 outline: 'none',
                 fontSize: '14px',
-                fontWeight: 600,
+                fontWeight: 700,
                 color: '#111',
               }}
             />
           </Autocomplete>
         ) : (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', color: '#999', fontSize: '14px' }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', color: '#999', fontSize: '13px', fontWeight: 700 }}>
             <Loader2 size={14} className="animate-spin" /> Cargando buscador...
           </div>
         )}
 
         {query && (
           <button 
-            onClick={() => setQuery('')}
-            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#999' }}
+            onClick={() => { setQuery(''); setAutocomplete(null); }}
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#CBD5E1' }}
+            className="hover:text-orange-500 transition-colors"
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         )}
       </div>

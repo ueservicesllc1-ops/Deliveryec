@@ -22,14 +22,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    // Si la carga terminó y no hay usuario, mandarlo al login de inmediato
-    if (!loading && !user) {
-      router.push('/login');
-    }
-  }, [loading, user, router]);
-
-  // Auto-detect city via GPS + OpenStreetMap Nominatim (free, no key needed)
+  // Removed forced login redirect for public browsing
   useEffect(() => {
     if (!navigator.geolocation) return;
     setGpsLoading(true);
@@ -75,13 +68,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Si no hay usuario y no está cargando (ya se ejecutó el push(login)), no renderizamos nada privado
-  if (!user && !loading) return null;
+  // Pure blank layout for checkout to avoid any mounting/clashing issues
+  if (pathname.includes('/checkout')) {
+    return <div className="min-h-screen bg-[#F1F5F9]">{children}</div>;
+  }
 
   const navItems = [
-    { href: '/app',         icon: <Home size={22} />,          label: 'Inicio' },
-    { href: '/app/orders',  icon: <ClipboardList size={22} />, label: 'Pedidos' },
-    { href: '/app/search',  icon: <Search size={22} />,        label: 'Buscar' },
+    { href: '/order',         icon: <Home size={22} />,          label: 'Inicio' },
+    { href: '/order/orders',  icon: <ClipboardList size={22} />, label: 'Pedidos' },
+    { href: '/order/search',  icon: <Search size={22} />,        label: 'Buscar' },
     { href: '#profile',     icon: <User size={22} />,          label: 'Perfil', onClick: () => setProfileOpen(true) },
   ];
 
@@ -89,113 +84,136 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div style={{
+      width: '100%',
       minHeight: '100dvh',
       background: '#F5F5F7',
       fontFamily: 'Inter, -apple-system, sans-serif',
       display: 'flex',
       flexDirection: 'column',
-      maxWidth: '480px',
-      margin: '0 auto',
-      position: 'relative',
     }}>
 
-      {/* ── TOP HEADER ── */}
-      <header style={{
-        background: 'white',
-        borderBottom: '1px solid rgba(0,0,0,0.06)',
-        padding: '14px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        position: 'sticky',
-        top: 0,
-        zIndex: 50,
-        boxShadow: '0 1px 8px rgba(0,0,0,0.04)',
-      }}>
-        {/* Logo */}
-        <Link href="/app" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
-          <div style={{ background: '#FF5722', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 900, fontSize: '16px', fontStyle: 'italic' }}>D</div>
-          <span style={{ fontSize: '18px', fontWeight: 900, color: '#111', letterSpacing: '-0.5px' }}>
-            Delivery<span style={{ color: '#FF5722' }}>.ec</span>
-          </span>
-        </Link>
+      {/* ── TOP HEADER (full viewport width, content capped at 1280px) ── */}
+      {!pathname.includes('/checkout') && (
+        <header style={{
+          background: 'white',
+          borderBottom: '1px solid rgba(0,0,0,0.06)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
+          boxShadow: '0 1px 8px rgba(0,0,0,0.04)',
+          width: '100%',
+        }}>
+        <div style={{
+          maxWidth: '1280px',
+          margin: '0 auto',
+          padding: '14px 32px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '24px',
+        }}>
+          {/* Logo */}
+          <Link href="/order" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', flexShrink: 0 }}>
+            <img src="/logo.png" alt="Deliveryy" style={{ height: '32px', width: 'auto', objectFit: 'contain' }} />
+          </Link>
 
-        {/* Location + Avatar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#F5F5F7', borderRadius: '10px', padding: '6px 10px', cursor: 'pointer' }}>
-            <MapPin size={14} color="#FF5722" />
-            {gpsLoading ? (
-              <Loader2 size={12} color="#999" className="animate-spin" />
-            ) : (
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#333', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {city || '...'}
-              </span>
-            )}
-            <ChevronDown size={12} color="#999" />
+          {/* Desktop nav tabs */}
+          <nav className="hidden md:flex" style={{ gap: '4px', alignItems: 'center', flex: 1, justifyContent: 'center' }}>
+            {navItems.filter(n => n.href !== '#profile').map(item => {
+              const active = isActive(item.href);
+              return (
+                <button
+                  key={item.label}
+                  onClick={() => router.push(item.href)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '8px 16px', borderRadius: '12px', border: 'none',
+                    background: active ? '#FFF0EE' : 'transparent',
+                    color: active ? '#FF5722' : '#666',
+                    fontWeight: active ? 700 : 600,
+                    fontSize: '14px', cursor: 'pointer',
+                  }}
+                >
+                  {React.cloneElement(item.icon, { size: 16 })}
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Location + Avatar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#F5F5F7', borderRadius: '10px', padding: '6px 10px', cursor: 'pointer' }}>
+              <MapPin size={14} color="#FF5722" />
+              {gpsLoading ? (
+                <Loader2 size={12} color="#999" className="animate-spin" />
+              ) : (
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#333', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {city || '...'}
+                </span>
+              )}
+              <ChevronDown size={12} color="#999" />
+            </div>
+            <button
+              onClick={() => setProfileOpen(true)}
+              style={{ width: '36px', height: '36px', background: '#FF5722', borderRadius: '50%', border: 'none', color: 'white', fontWeight: 900, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+            >
+              {profile?.name?.[0]?.toUpperCase() || 'U'}
+            </button>
           </div>
-          <button
-            onClick={() => setProfileOpen(true)}
-            style={{ width: '36px', height: '36px', background: '#FF5722', borderRadius: '50%', border: 'none', color: 'white', fontWeight: 900, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-          >
-            {profile?.name?.[0]?.toUpperCase() || 'U'}
-          </button>
         </div>
       </header>
+    )}
 
       {/* ── PAGE CONTENT ── */}
-      <main style={{ flex: 1, overflowY: 'auto', paddingBottom: '80px' }}>
+      <main style={{ 
+        flex: 1, 
+        width: '100%', 
+        maxWidth: pathname.includes('/checkout') ? 'none' : '1280px', 
+        margin: '0 auto', 
+        paddingBottom: pathname.includes('/checkout') ? '0' : '80px', 
+        boxSizing: 'border-box' 
+      }}>
         {children}
       </main>
 
-      {/* ── BOTTOM NAV ── */}
-      <nav style={{
-        position: 'fixed',
-        bottom: 0,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: '100%',
-        maxWidth: '480px',
-        background: 'white',
-        borderTop: '1px solid rgba(0,0,0,0.06)',
-        display: 'flex',
-        alignItems: 'stretch',
-        height: '68px',
-        zIndex: 50,
-        boxShadow: '0 -4px 20px rgba(0,0,0,0.06)',
-      }}>
-        {navItems.map((item) => {
-          const active = isActive(item.href);
-          return (
-            <button
-              key={item.label}
-              onClick={item.onClick || (() => router.push(item.href))}
-              style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '3px',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: active ? '#FF5722' : '#BBBBC0',
-                transition: 'color 0.2s',
-                padding: '8px 0',
-                position: 'relative',
-              }}
-            >
-              {active && (
-                <div style={{ position: 'absolute', top: 0, left: '25%', right: '25%', height: '2px', background: '#FF5722', borderRadius: '0 0 4px 4px' }} />
-              )}
-              {React.cloneElement(item.icon, { size: 22, strokeWidth: active ? 2.5 : 1.8 })}
-              <span style={{ fontSize: '10px', fontWeight: active ? 800 : 600, letterSpacing: '0.02em' }}>
-                {item.label}
-              </span>
-            </button>
-          );
-        })}
-      </nav>
+      {/* ── BOTTOM NAV (mobile only) ── */}
+      {!pathname.includes('/checkout') && (
+        <nav className="md:hidden fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-white border-t border-black/5 flex items-stretch h-[68px] z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+          {navItems.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <button
+                key={item.label}
+                onClick={item.onClick || (() => router.push(item.href))}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '3px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: active ? '#FF5722' : '#BBBBC0',
+                  transition: 'color 0.2s',
+                  padding: '8px 0',
+                  position: 'relative',
+                }}
+              >
+                {active && (
+                  <div style={{ position: 'absolute', top: 0, left: '25%', right: '25%', height: '2px', background: '#FF5722', borderRadius: '0 0 4px 4px' }} />
+                )}
+                {React.cloneElement(item.icon, { size: 22, strokeWidth: active ? 2.5 : 1.8 })}
+                <span style={{ fontSize: '10px', fontWeight: active ? 800 : 600, letterSpacing: '0.02em' }}>
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
 
       {/* ── PROFILE SLIDE-UP SHEET ── */}
       {profileOpen && (
@@ -204,19 +222,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             onClick={() => setProfileOpen(false)}
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, backdropFilter: 'blur(4px)' }}
           />
-          <div style={{
-            position: 'fixed',
-            bottom: 0,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: '100%',
-            maxWidth: '480px',
-            background: 'white',
-            borderRadius: '28px 28px 0 0',
-            zIndex: 101,
-            padding: '8px 24px 36px',
-            boxShadow: '0 -8px 40px rgba(0,0,0,0.2)',
-          }}>
+          <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] md:max-w-[1200px] bg-white rounded-t-[28px] z-[101] p-[8px_24px_36px] shadow-[0_-8px_40px_rgba(0,0,0,0.2)]">
             {/* Drag handle */}
             <div style={{ width: '40px', height: '4px', background: '#E5E5E5', borderRadius: '99px', margin: '12px auto 24px' }} />
 
@@ -241,8 +247,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Menu Items */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {[
-                { icon: <Home size={20} />, label: 'Inicio',      href: '/app' },
-                { icon: <ClipboardList size={20} />, label: 'Mis Pedidos', href: '/app/orders' },
+                { icon: <Home size={20} />, label: 'Inicio',      href: '/order' },
+                { icon: <ClipboardList size={20} />, label: 'Mis Pedidos', href: '/order/orders' },
                 { icon: <Bike size={20} />, label: 'Quiero ser Driver', href: '/driver' },
               ].map((item) => (
                 <Link
@@ -347,12 +353,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            <button
-              onClick={handleSignOut}
-              style={{ width: '100%', marginTop: '16px', padding: '16px', background: '#FFF0EE', border: 'none', borderRadius: '16px', color: '#FF5722', fontWeight: 800, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-            >
-              <LogOut size={18} /> Cerrar Sesión
-            </button>
+            {user ? (
+              <button
+                onClick={handleSignOut}
+                style={{ width: '100%', marginTop: '16px', padding: '16px', background: '#FFF0EE', border: 'none', borderRadius: '16px', color: '#FF5722', fontWeight: 800, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              >
+                <LogOut size={18} /> Cerrar Sesión
+              </button>
+            ) : (
+              <button
+                onClick={() => router.push('/login')}
+                style={{ width: '100%', marginTop: '16px', padding: '16px', background: '#FF5722', border: 'none', borderRadius: '16px', color: 'white', fontWeight: 800, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              >
+                <User size={18} /> Iniciar Sesión / Registrarse
+              </button>
+            )}
           </div>
         </>
       )}

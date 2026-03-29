@@ -6,10 +6,15 @@ import { GetObjectCommand } from '@aws-sdk/client-s3';
 // Proxies the request to Backblaze B2 with correct CORS headers
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
-    const key = params.path.join('/');
+    // IMPORTANTE: En versiones nuevas de Next.js params es una promesa
+    const resolvedParams = await params;
+    const key = resolvedParams.path.join('/');
+
+    console.log('--- EXTRACCION B2 ---');
+    console.log('Buscando Key:', key);
 
     const command = new GetObjectCommand({
       Bucket: b2BucketName,
@@ -19,30 +24,25 @@ export async function GET(
     const response = await s3Client.send(command);
 
     if (!response.Body) {
-      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+      return NextResponse.json({ error: 'File body empty' }, { status: 404 });
     }
 
-    const chunks: Uint8Array[] = [];
-    const reader = (response.Body as AsyncIterable<Uint8Array>);
-    for await (const chunk of reader) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
+    // Convertir el stream de B2 a un buffer legible
+    const bytes = await response.Body.transformToByteArray();
+    const buffer = Buffer.from(bytes);
 
     return new NextResponse(buffer, {
       status: 200,
       headers: {
-        'Content-Type': response.ContentType || 'application/octet-stream',
+        'Content-Type': response.ContentType || 'image/png',
         'Cache-Control': 'public, max-age=31536000, immutable',
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
       },
     });
 
   } catch (error) {
-    console.error('Media proxy error:', error);
-    return NextResponse.json({ error: 'File not found' }, { status: 404 });
+    console.error('CRITICAL: Media proxy error:', error);
+    return NextResponse.json({ error: 'Media not found in storage' }, { status: 404 });
   }
 }
 

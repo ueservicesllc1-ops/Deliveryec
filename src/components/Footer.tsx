@@ -28,17 +28,8 @@ export default function Footer() {
 
           {/* Brand */}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <div style={{ width: '28px', height: '28px', background: 'var(--orange)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/>
-                  <circle cx="16" cy="17" r="3"/><circle cx="8" cy="17" r="3"/>
-                  <path d="M15 14l4.5-4.5L21 11l-2 6"/>
-                </svg>
-              </div>
-              <span style={{ fontFamily: 'Outfit,sans-serif', fontWeight: 800, fontSize: '18px' }}>
-                Delivery<span style={{ color: 'var(--orange)' }}>.ec</span>
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+              <img src="/logo.png" style={{ height: '28px', objectFit: 'contain' }} alt="Deliveryy" />
             </div>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', lineHeight: 1.7, marginBottom: '18px' }}>
               Comida rápida, segura y deliciosa.

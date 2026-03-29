@@ -57,7 +57,7 @@ export default function RegisterBusiness() {
       });
       
       setIsSuccess(true);
-      setTimeout(() => router.push('/app'), 3000);
+      setTimeout(() => router.push('/order'), 3000);
     } catch (err) {
       console.error("Error al registrar negocio:", err);
       alert("Hubo un error al enviar tu solicitud. Inténtalo de nuevo.");
