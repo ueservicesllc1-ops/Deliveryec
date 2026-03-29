@@ -23,6 +23,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
+  const [addedId, setAddedId] = useState<string | null>(null);
+  const [cartBounce, setCartBounce] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -73,6 +75,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
   const handleAddToCart = (item: any) => {
     addItemToCart(item, { id, name: restaurant?.name || 'Restaurante' });
+    setAddedId(item.id);
+    setCartBounce(true);
+    setTimeout(() => setAddedId(null), 1200);
+    setTimeout(() => setCartBounce(false), 400);
   };
 
   const goToCheckout = () => {
@@ -137,7 +143,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           {cart.length > 0 && (
             <motion.button 
               initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
+              animate={{ scale: cartBounce ? 1.2 : 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 15 }}
               onClick={goToCheckout}
               style={{
                 height: '40px', 
@@ -151,7 +158,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 cursor: 'pointer',
                 fontWeight: 800,
                 fontSize: '13px',
-                boxShadow: '0 4px 15px rgba(255,87,34,0.4)',
+                boxShadow: cartBounce ? '0 6px 25px rgba(255,87,34,0.7)' : '0 4px 15px rgba(255,87,34,0.4)',
                 border: '1.5px solid rgba(255,255,255,0.3)'
               }}
             >
@@ -292,15 +299,17 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               <h5 style={{ margin: '0 0 6px', fontSize: '18px', fontWeight: 900, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '-0.5px' }}>{item.name}</h5>
               <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748B', lineHeight: 1.5, fontWeight: 500 }}>{item.description}</p>
               
-              <button 
+              <motion.button 
                 onClick={() => handleAddToCart(item)}
+                animate={addedId === item.id ? { scale: [1, 0.95, 1] } : { scale: 1 }}
+                transition={{ duration: 0.2 }}
                 style={{ 
                   width: '100%', 
                   padding: '14px', 
-                  background: '#F8F9FA', 
-                  border: '2px solid #F1F5F9', 
+                  background: addedId === item.id ? '#22C55E' : '#F8F9FA', 
+                  border: addedId === item.id ? '2px solid #22C55E' : '2px solid #F1F5F9', 
                   borderRadius: '16px', 
-                  color: '#1E293B', 
+                  color: addedId === item.id ? 'white' : '#1E293B', 
                   cursor: 'pointer', 
                   display: 'flex', 
                   alignItems: 'center', 
@@ -308,12 +317,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   gap: '12px',
                   fontWeight: 800,
                   fontSize: '13px',
-                  transition: 'all 0.2s'
+                  transition: 'background 0.3s, border 0.3s, color 0.3s',
+                  boxShadow: addedId === item.id ? '0 4px 15px rgba(34,197,94,0.35)' : 'none'
                 }}
-                className="hover:bg-orange-500 hover:border-orange-500 hover:text-white group"
               >
-                <Plus size={18} strokeWidth={3} className="text-orange-500 group-hover:text-white" /> AGREGAR AL CARRITO
-              </button>
+                {addedId === item.id 
+                  ? <><span style={{ fontSize: '16px' }}>✓</span> ¡AGREGADO!</>
+                  : <><Plus size={18} strokeWidth={3} style={{ color: '#FF5722' }} /> AGREGAR AL CARRITO</>}
+              </motion.button>
             </div>
           </motion.div>
         ))}

@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { MapPin, ArrowRight, Clock, Bike, Store } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
-import { useLoadScript, Autocomplete } from '@react-google-maps/api';
 
 const stats = [
   { icon: <Clock size={15} />, label: 'Entrega en 25–35 min', sub: 'Promedio en tu zona' },
@@ -11,45 +10,56 @@ const stats = [
   { icon: <Store size={15} />, label: '+2,500 Restaurantes', sub: 'En toda la ciudad' },
 ];
 
-const libraries: any[] = ['places'];
+const API_KEY = 'AIzaSyC-_aiyna5INqc4ag6_7Uo9zZCahojon2c';
+
+let gmReady = false;
+function loadGMaps(): Promise<void> {
+  return new Promise((resolve) => {
+    if (gmReady || (window as any).google?.maps?.places) { gmReady = true; resolve(); return; }
+    if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+      const t = setInterval(() => { if ((window as any).google?.maps?.places) { clearInterval(t); gmReady = true; resolve(); } }, 200);
+      return;
+    }
+    (window as any).__heroGmReady = () => { gmReady = true; resolve(); };
+    const s = document.createElement('script');
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places&language=es&region=EC&callback=__heroGmReady`;
+    s.async = true; s.defer = true;
+    document.head.appendChild(s);
+  });
+}
 
 export default function HeroSection() {
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: 'AIzaSyC-_aiyna5INqc4ag6_7Uo9zZCahojon2c',
-    libraries,
-  });
+  const inputRef = useRef<HTMLInputElement>(null);
+  const acRef    = useRef<any>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   const [address, setAddress] = useState('');
-  const [userBounds, setUserBounds] = useState<any>(null);
-  const autocompleteRef = useRef<any>(null);
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          setUserBounds({
-            north: lat + 0.1,
-            south: lat - 0.1,
-            east: lng + 0.1,
-            west: lng - 0.1,
-          });
-        },
-        (err) => console.warn('Geolocation error:', err),
-        { timeout: 5000 }
-      );
-    }
+    loadGMaps().then(() => {
+      setIsLoaded(true);
+      if (!inputRef.current) return;
+      const ac = new (window as any).google.maps.places.Autocomplete(inputRef.current, {
+        fields: ['formatted_address'], types: ['geocode', 'establishment'], componentRestrictions: { country: 'ec' },
+      });
+      acRef.current = ac;
+      ac.addListener('place_changed', () => {
+        const place = ac.getPlace();
+        if (place?.formatted_address) setAddress(place.formatted_address);
+      });
+
+      // Geolocation bias
+      navigator.geolocation?.getCurrentPosition(({ coords }) => {
+        ac.setBounds(new (window as any).google.maps.LatLngBounds(
+          { lat: coords.latitude - 0.1, lng: coords.longitude - 0.1 },
+          { lat: coords.latitude + 0.1, lng: coords.longitude + 0.1 }
+        ));
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handlePlaceChanged = () => {
-    if (autocompleteRef.current) {
-      const place = autocompleteRef.current.getPlace();
-      if (place && place.formatted_address) {
-        setAddress(place.formatted_address);
-      }
-    }
-  };
+  const handlePlaceChanged = () => {};
 
   return (
     <section id="hero" style={{
@@ -209,24 +219,20 @@ export default function HeroSection() {
               <MapPin size={17} color="var(--orange)" style={{ flexShrink: 0 }} />
               {isLoaded ? (
                 <div style={{ flex: 1, width: '100%' }}>
-                  <Autocomplete
-                    onLoad={(auto) => { autocompleteRef.current = auto; }}
-                    onPlaceChanged={handlePlaceChanged}
-                    options={userBounds ? { bounds: userBounds } : {}}
-                  >
-                    <input
-                      type="text"
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      placeholder="Ingresa tu dirección de entrega..."
-                      style={{
-                        width: '100%', border: 'none', outline: 'none',
-                        fontSize: '14px', color: 'var(--text-dark)',
-                        padding: '15px 0', background: 'transparent',
-                        fontFamily: 'Inter, sans-serif',
-                      }}
-                    />
-                  </Autocomplete>
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Ingresa tu dirección de entrega..."
+                    autoComplete="off"
+                    style={{
+                      width: '100%', border: 'none', outline: 'none',
+                      fontSize: '14px', color: 'var(--text-dark)',
+                      padding: '15px 0', background: 'transparent',
+                      fontFamily: 'Inter, sans-serif',
+                    }}
+                  />
                 </div>
               ) : (
                 <input

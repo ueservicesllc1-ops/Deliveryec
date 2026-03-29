@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { Loader2, CheckCircle2, Power, PowerOff, Star, ChevronDown } from 'lucide-react';
+import { Loader2, CheckCircle2, Power, PowerOff, Star, ChevronDown, Bike } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const LiveMap = dynamic(() => import('@/components/LiveMap'), { ssr: false });
@@ -21,12 +21,149 @@ export default function DriverApp() {
   const [showMap, setShowMap]             = useState(false);
   const [earnings, setEarnings]           = useState(0);
   const watchId = useRef<number | null>(null);
+  const [showSplash, setShowSplash]         = useState(true);
   const router = useRouter();
 
-  // Redirect to login once auth is resolved and no user found
+  // 3-second Splash Screen
   useEffect(() => {
-    if (!authLoading && !user) router.push('/login');
-  }, [authLoading, user]);
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
+
+  // Dedicated Driver Login screen if no user
+  if (showSplash) {
+    return (
+      <AnimatePresence>
+        <motion.div
+          key="splash"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#09090b', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: [0.8, 1.1, 1], opacity: 1 }}
+            transition={{ duration: 1.5, ease: "easeOut", repeat: Infinity, repeatType: "reverse" }}
+            style={{ width: '120px', height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <img src="/logo.png" alt="Delivery.ec" style={{ width: '100%', objectFit: 'contain' }} />
+          </motion.div>
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.5, duration: 1 }}
+            style={{ marginTop: '24px', textAlign: 'center' }}
+          >
+            <h1 style={{ color: 'white', fontSize: '24px', fontWeight: 900, letterSpacing: '-0.5px', margin: 0 }}>Driver Portal</h1>
+            <p style={{ color: '#FF5722', fontSize: '14px', fontWeight: 600, letterSpacing: '2px', marginTop: '8px' }}>INICIANDO</p>
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
+
+  if (authLoading) return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#09090b' }}><Loader2 className="animate-spin" color="#FF5722" size={32} /></div>;
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoggingIn(true);
+    setLoginError('');
+    try {
+      const { signInWithEmailAndPassword } = await import('firebase/auth');
+      const { auth: fbAuth } = await import('@/lib/firebase');
+      await signInWithEmailAndPassword(fbAuth, email, password);
+    } catch (err: any) {
+      setLoginError('Correo o contraseña incorrectos.');
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  if (!user || !profile) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#09090b', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', fontFamily: 'Inter' }}>
+        <div style={{ width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          
+          {/* Logo */}
+          <div style={{ display:'flex', alignItems:'center', gap:'12px', marginBottom:'40px' }}>
+            <div style={{ background:'transparent', height:'48px', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <img src="/logo.png" alt="Delivery.ec" style={{ height: '40px', objectFit: 'contain' }} />
+            </div>
+          </div>
+
+          <h2 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '24px', textAlign: 'center' }}>Portal de Conductores</h2>
+
+          {/* Login Form */}
+          <form onSubmit={handleLogin} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ position: 'relative' }}>
+              <input type="email" placeholder="Correo electrónico" required value={email} onChange={e=>setEmail(e.target.value)} style={{ width: '100%', padding: '16px', borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', outline: 'none', fontSize: '15px' }} />
+            </div>
+            <div style={{ position: 'relative' }}>
+              <input type="password" placeholder="Contraseña" required value={password} onChange={e=>setPassword(e.target.value)} style={{ width: '100%', padding: '16px', borderRadius: '14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'white', outline: 'none', fontSize: '15px' }} />
+            </div>
+            {loginError && <p style={{ color:'#EF4444', fontSize:'13px', margin:'0', textAlign: 'center', fontWeight: 600 }}>{loginError}</p>}
+            
+            <button type="submit" disabled={loggingIn} style={{ width: '100%', margin: '8px 0', padding: '16px', background: '#FF5722', color: 'white', border: 'none', borderRadius: '14px', fontWeight: 800, fontSize: '15px', cursor: 'pointer', display: 'flex', justifyContent: 'center' }}>
+              {loggingIn ? <Loader2 className="animate-spin" /> : 'Iniciar Sesión'}
+            </button>
+          </form>
+
+          {/* Register Link */}
+          <div style={{ marginTop: '32px', textAlign: 'center', paddingBottom: '24px' }}>
+            <p style={{ color: '#888', fontSize: '14px', margin: '0 0 8px' }}>¿Aún no eres parte del equipo de drivers?</p>
+            <button onClick={() => router.push('/driver/register')} style={{ background: 'transparent', color: '#FF5722', border: 'none', fontWeight: 800, fontSize: '15px', cursor: 'pointer' }}>
+              Registrarme como Driver
+            </button>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // Block users without proper driver approval
+  if (profile.role !== 'driver') {
+    return (
+      <div style={{ minHeight: '100vh', background: '#09090b', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center', fontFamily: 'Inter' }}>
+        <div style={{ width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#1a1a1e', padding: '40px 24px', borderRadius: '24px', border: '1px solid rgba(255,87,34,0.1)' }}>
+          
+          <div style={{ background:'transparent', height:'64px', display:'flex', alignItems:'center', justifyContent:'center', marginBottom: '24px' }}>
+            <img src="/logo.png" alt="Delivery.ec" style={{ height: '48px', objectFit: 'contain' }} />
+          </div>
+
+          {profile.status === 'pending_approval' ? (
+            <>
+              <h2 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '12px' }}>Tu solicitud está en revisión</h2>
+              <p style={{ color: '#888', fontSize: '15px', lineHeight: 1.6, marginBottom: '24px' }}>Nuestro equipo está verificando tus documentos de identidad y vehículo. Por favor espera, recibirás una respuesta oficial en las próximas 24 horas.</p>
+              
+              <button onClick={() => { auth.signOut(); window.location.reload(); }} style={{ padding: '12px 24px', borderRadius: '12px', background: 'transparent', color: '#666', fontWeight: 700, border: '1px solid rgba(255,255,255,0.1)', fontSize: '14px', cursor: 'pointer' }}>
+                Cerrar Sesión
+              </button>
+            </>
+          ) : (
+            <>
+              <h2 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '12px' }}>Acceso Denegado</h2>
+              <p style={{ color: '#888', fontSize: '15px', marginBottom: '32px', lineHeight: 1.6 }}>Tu cuenta actual no tiene privilegios de Repartidor Independiente. Necesitas registrarte y pasar por el filtro administrativo.</p>
+              <button onClick={() => router.push('/driver/register')} style={{ width: '100%', padding: '16px', borderRadius: '16px', background: '#FF5722', color: 'white', fontWeight: 800, border: 'none', fontSize: '16px', cursor: 'pointer', marginBottom: '16px', boxShadow: '0 8px 30px rgba(255,87,34,0.3)' }}>
+                Aplicar como Driver
+              </button>
+              <button onClick={() => { auth.signOut(); window.location.reload(); }} style={{ fontSize: '14px', color: '#666', background: 'none', border: 'none', fontWeight: 700, cursor: 'pointer' }}>
+                Cambiar de Cuenta
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   /* ── Real-time orders ── */
   useEffect(() => {

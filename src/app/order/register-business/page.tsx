@@ -170,7 +170,7 @@ export default function RegisterBusiness() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <label style={{ fontSize: '13px', fontWeight: 800, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dirección exacta del Local *</label>
           <AddressAutocomplete 
-            onAddressSelect={(addr, coord) => setFormData({ ...formData, address: addr, location: coord })}
+            onAddressSelect={(addr, coord) => setFormData({ ...formData, address: addr, location: coord ?? null })}
             placeholder="Introduce la ubicación del local"
           />
         </div>

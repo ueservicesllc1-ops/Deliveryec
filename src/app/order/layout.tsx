@@ -19,8 +19,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [tempAddress, setTempAddress] = useState<string | null>(null);
   const [tempCoords, setTempCoords]   = useState<[number, number] | null>(null);
   const [isSaving, setIsSaving]       = useState(false);
+  const [persistentAddress, setPersistentAddress] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
+
+  // Load address from Profile or LocalStorage (for guests)
+  useEffect(() => {
+    if (profile?.defaultAddress) {
+      setPersistentAddress(profile.defaultAddress);
+    } else if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('guestAddress');
+      if (stored) setPersistentAddress(stored);
+    }
+  }, [profile]);
 
   // Removed forced login redirect for public browsing
   useEffect(() => {
@@ -92,7 +103,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       flexDirection: 'column',
     }}>
 
-      {/* ── TOP HEADER (full viewport width, content capped at 1280px) ── */}
+      {/* ── TOP HEADER (Light Premium aesthetic) ── */}
       {!pathname.includes('/checkout') && (
         <header style={{
           background: 'white',
@@ -100,7 +111,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           position: 'sticky',
           top: 0,
           zIndex: 50,
-          boxShadow: '0 1px 8px rgba(0,0,0,0.04)',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
           width: '100%',
         }}>
         <div style={{
@@ -114,10 +125,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         }}>
           {/* Logo */}
           <Link href="/order" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', flexShrink: 0 }}>
-            <img src="/logo.png" alt="Deliveryy" style={{ height: '32px', width: 'auto', objectFit: 'contain' }} />
+            <img src="/logo2.png" alt="Delivery" style={{ height: '32px', width: 'auto', objectFit: 'contain' }} />
           </Link>
 
-          {/* Desktop nav tabs */}
+          {/* Desktop nav tabs (Light Premium) */}
           <nav className="hidden md:flex" style={{ gap: '4px', alignItems: 'center', flex: 1, justifyContent: 'center' }}>
             {navItems.filter(n => n.href !== '#profile').map(item => {
               const active = isActive(item.href);
@@ -141,7 +152,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          {/* Location + Avatar */}
+          {/* Location + Avatar (Light Version) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#F5F5F7', borderRadius: '10px', padding: '6px 10px', cursor: 'pointer' }}>
               <MapPin size={14} color="#FF5722" />
@@ -215,37 +226,41 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
       )}
 
-      {/* ── PROFILE SLIDE-UP SHEET ── */}
+      {/* ── PROFILE DROP-DOWN (Square Premium) ── */}
       {profileOpen && (
         <>
           <div
             onClick={() => setProfileOpen(false)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, backdropFilter: 'blur(4px)' }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.05)', zIndex: 100 }}
           />
-          <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] md:max-w-[1200px] bg-white rounded-t-[28px] z-[101] p-[8px_24px_36px] shadow-[0_-8px_40px_rgba(0,0,0,0.2)]">
-            {/* Drag handle */}
-            <div style={{ width: '40px', height: '4px', background: '#E5E5E5', borderRadius: '99px', margin: '12px auto 24px' }} />
+          <div 
+            className="fixed bottom-0 left-0 w-full bg-white border border-black/10 z-[101] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.1)] md:top-[80px] md:bottom-auto md:left-auto md:w-[400px] md:rounded-[4px] md:border md:border-black/5"
+            style={{ 
+              maxHeight: 'calc(100vh - 100px)', 
+              overflowY: 'auto',
+              right: 'max(32px, calc(50vw - 640px + 32px))'
+            }}
+          >
+            {/* Minimal drag handle for mobile */}
+            <div className="md:hidden" style={{ width: '32px', height: '2px', background: '#EEE', margin: '0 auto 32px' }} />
 
-            <button onClick={() => setProfileOpen(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: '#F5F5F7', border: 'none', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <X size={18} color="#666" />
+            <button onClick={() => setProfileOpen(false)} style={{ position: 'absolute', top: '24px', right: '24px', background: '#F8F9FA', border: 'none', width: '32px', height: '32px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <X size={16} color="#999" />
             </button>
 
-            {/* Avatar + Name */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid #F0F0F0' }}>
-              <div style={{ width: '60px', height: '60px', background: '#FF5722', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 900, fontSize: '24px', flexShrink: 0 }}>
+            {/* Avatar + Name (Loose Layout) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '32px', paddingBottom: '32px', borderBottom: '1px solid #F0F0F0' }}>
+              <div style={{ width: '56px', height: '56px', background: '#FF5722', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 900, fontSize: '20px', flexShrink: 0 }}>
                 {profile?.name?.[0]?.toUpperCase() || 'U'}
               </div>
-              <div>
-                <p style={{ margin: 0, fontSize: '18px', fontWeight: 900, color: '#111', letterSpacing: '-0.3px' }}>{profile?.name || 'Usuario'}</p>
-                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#999', fontWeight: 500 }}>{user?.email || user?.phoneNumber}</p>
-                <div style={{ marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#FFF3EE', borderRadius: '99px', padding: '3px 10px' }}>
-                  <span style={{ fontSize: '10px', fontWeight: 800, color: '#FF5722', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{profile?.role || 'Cliente'}</span>
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#111', letterSpacing: '-0.3px' }}>{profile?.name || 'Usuario'}</p>
+                <p style={{ margin: 0, fontSize: '13px', color: '#888', fontWeight: 500 }}>{user?.email || user?.phoneNumber}</p>
               </div>
             </div>
 
-            {/* Menu Items */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {/* Menu Items (More Spaced) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {[
                 { icon: <Home size={20} />, label: 'Inicio',      href: '/order' },
                 { icon: <ClipboardList size={20} />, label: 'Mis Pedidos', href: '/order/orders' },
@@ -255,119 +270,90 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   key={item.label}
                   href={item.href}
                   onClick={() => setProfileOpen(false)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 16px', borderRadius: '16px', textDecoration: 'none', color: '#111', background: 'transparent' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', borderRadius: '4px', textDecoration: 'none', color: '#333', transition: 'all 0.2s', background: 'transparent' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#F8F9FA'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <div style={{ width: '40px', height: '40px', background: '#F5F5F7', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
-                    {item.icon}
-                  </div>
+                  <div style={{ color: '#BBB' }}>{item.icon}</div>
                   <span style={{ fontSize: '15px', fontWeight: 700 }}>{item.label}</span>
                 </Link>
               ))}
 
-              {/* Default Address Section */}
-              <div style={{ marginTop: '20px', padding: '16px', borderRadius: '24px', background: '#F8F9FA', border: '1px solid #F0F0F0' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                  <div style={{ width: '36px', height: '36px', background: 'white', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FF5722', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+              {/* Default Address Section (Loose & Square) */}
+              <div style={{ marginTop: '24px', padding: '24px', background: '#F8F9FA', borderRadius: '4px', border: '1px solid #EEE' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                  <div style={{ width: '40px', height: '40px', background: 'white', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FF5722', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                     <MapPin size={20} />
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ margin: 0, fontSize: '11px', fontWeight: 800, color: '#999', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dirección Guardada</p>
-                    <p style={{ margin: '2px 0 0', fontSize: '13px', fontWeight: 700, color: '#333', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {profile?.defaultAddress || 'No configurada'}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <p style={{ margin: 0, fontSize: '11px', fontWeight: 800, color: '#AAA', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dirección Guardada</p>
+                    <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#333', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {persistentAddress || 'No configurada'}
                     </p>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <p style={{ margin: 0, fontSize: '10px', fontWeight: 800, color: '#BBB', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cambiar dirección</p>
+                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 800, color: '#AAA', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cambiar dirección</p>
                   <AddressAutocomplete 
                     onAddressSelect={(addr, coord) => {
                       setTempAddress(addr);
-                      setTempCoords(coord);
+                      setTempCoords(coord || null);
                     }}
                     placeholder="Casa, Oficina, Departamento..."
-                    initialValue={profile?.defaultAddress}
+                    initialValue={persistentAddress || ''}
                   />
 
                   {tempAddress && (
                     <button
                       onClick={async () => {
                         const currentUser = user || auth.currentUser;
-                        console.log("Intentando guardar dirección:", tempAddress, "Usuario:", currentUser?.uid);
-                        
-                        if (!currentUser) {
-                          console.error("DEBUG: No hay usuario en el Context ni en Auth directo.");
-                          alert("Error de sesión. Por favor, cierra sesión y vuelve a entrar.");
-                          return;
-                        }
-
                         setIsSaving(true);
                         try {
-                          const profileRef = doc(db, 'profiles', currentUser.uid);
-                          await setDoc(profileRef, {
-                            defaultAddress: tempAddress,
-                            defaultLocation: { lat: tempCoords?.[0], lng: tempCoords?.[1] }
-                          }, { merge: true });
-                          
-                          console.log("¡Dirección guardada con éxito!");
-                          // Recargamos para ver los cambios
-                          window.location.reload();
+                          if (currentUser) {
+                            const profileRef = doc(db, 'profiles', currentUser.uid);
+                            await setDoc(profileRef, {
+                              defaultAddress: tempAddress,
+                              defaultLocation: { lat: tempCoords?.[0], lng: tempCoords?.[1] }
+                            }, { merge: true });
+                          } else {
+                            // Guest mode: save to localStorage
+                            localStorage.setItem('guestAddress', tempAddress);
+                            if (tempCoords) localStorage.setItem('guestCoords', JSON.stringify(tempCoords));
+                          }
+                          setPersistentAddress(tempAddress);
+                          setTempAddress(null); // Clear input after saving
                         } catch (err) {
-                          console.error("Error al guardar en Firestore:", err);
-                          alert("Error al guardar la dirección. Revisa la consola.");
+                          alert("Error al guardar.");
                         } finally {
                           setIsSaving(false);
                         }
                       }}
                       disabled={isSaving}
                       style={{
-                        width: '100%',
-                        padding: '16px',
-                        background: '#FF5722',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '16px',
-                        fontWeight: 900,
-                        fontSize: '14px',
-                        cursor: isSaving ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '10px',
-                        marginTop: '8px',
-                        boxShadow: '0 4px 15px rgba(255,87,34,0.3)',
-                        transition: 'all 0.2s',
-                        opacity: isSaving ? 0.7 : 1,
-                        transform: isSaving ? 'scale(0.98)' : 'scale(1)'
+                        width: '100%', padding: '16px', background: '#FF5722', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 900, fontSize: '14px', cursor: isSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '8px'
                       }}
                     >
-                      {isSaving ? (
-                        <Loader2 size={18} className="animate-spin" />
-                      ) : (
-                        <MapPin size={18} fill="white" />
-                      )}
-                      {isSaving ? 'GUARDANDO...' : 'GUARDAR ESTA DIRECCIÓN'}
+                      {isSaving ? <Loader2 size={18} className="animate-spin" /> : <MapPin size={18} fill="white" />}
+                      {isSaving ? 'GUARDANDO...' : 'ACTUALIZAR DIRECCIÓN'}
                     </button>
                   )}
                 </div>
               </div>
-            </div>
 
-            {user ? (
-              <button
-                onClick={handleSignOut}
-                style={{ width: '100%', marginTop: '16px', padding: '16px', background: '#FFF0EE', border: 'none', borderRadius: '16px', color: '#FF5722', fontWeight: 800, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-              >
-                <LogOut size={18} /> Cerrar Sesión
-              </button>
-            ) : (
-              <button
-                onClick={() => router.push('/login')}
-                style={{ width: '100%', marginTop: '16px', padding: '16px', background: '#FF5722', border: 'none', borderRadius: '16px', color: 'white', fontWeight: 800, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-              >
-                <User size={18} /> Iniciar Sesión / Registrarse
-              </button>
-            )}
+              {/* Authentication Actions */}
+              <div style={{ marginTop: '24px' }}>
+                {user ? (
+                  <button onClick={() => auth.signOut()} style={{ width: '100%', padding: '18px', borderRadius: '4px', background: 'transparent', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)', fontWeight: 800, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s' }}>
+                    <LogOut size={18} /> Cerrar Sesión
+                  </button>
+                ) : (
+                  <button onClick={() => router.push('/login')} style={{ width: '100%', padding: '18px', borderRadius: '4px', background: '#FF5722', color: 'white', border: 'none', fontWeight: 900, fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                    <User size={18} /> Iniciar Sesión / Registrarse
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </>
       )}

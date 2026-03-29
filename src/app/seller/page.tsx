@@ -10,7 +10,7 @@ import {
   Settings, Utensils, DollarSign, Tag, Star, Archive, Calendar, X, Send,
   BarChart3, PieChart, LineChart,
   Image as ImageIcon, Upload as UploadIcon, Loader2, MoreVertical, Plus, Monitor,
-  Search, CreditCard, Smartphone, Check, MoreHorizontal
+  Search, CreditCard, Smartphone, Check, MoreHorizontal, AlertTriangle
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { db } from '@/lib/firebase';
@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import AddressAutocomplete from '@/components/AddressAutocomplete';
 
 const TRANSLATIONS: Record<string, any> = {
   Spanish: {
@@ -57,6 +58,10 @@ export default function OrderReceptionManager() {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [dishToDelete, setDishToDelete] = useState<any>(null);
   const [newDish, setNewDish] = useState({ name: '', price: '', category: 'Main', image: '' });
+  const [cancelReqOrder, setCancelReqOrder] = useState<any>(null); // modal de solicitud
+  const [cancelReason, setCancelReason] = useState('Producto agotado');
+  const [cancelOtherText, setCancelOtherText] = useState('');
+  const [sendingCancelReq, setSendingCancelReq] = useState(false);
   const [chartType, setChartType] = useState('bars');
   const [timeframe, setTimeframe] = useState('week');
   const [posCart, setPosCart] = useState<any[]>([]);
@@ -92,7 +97,27 @@ export default function OrderReceptionManager() {
     return () => { unsub1(); unsub2(); };
   }, [user]);
 
-  const updateStatus = async (id: string, s: string) => { await updateDoc(doc(db, 'orders', id), { status: s }); };
+  const updateStatus = async (id: string, s: string) => { 
+    await updateDoc(doc(db, 'orders', id), { status: s }); 
+    const order = orders.find(o => o.id === id);
+    if (order && order.userId) {
+      let title = ''; let body = '';
+      if (s === 'cooking') { title = '¡Pedido Aceptado! 🧑‍🍳'; body = 'Tu pedido está siendo preparado.'; }
+      else if (s === 'ready') { title = '¡Pedido Listo! 🍔'; body = 'Tu pedido está listo y empacado.'; }
+      else if (s === 'dispatched') { title = '¡En Camino! 🛵'; body = 'Tu pedido ya salió del local y va en camino.'; }
+      
+      if (title) {
+        try {
+          await fetch('/api/push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: order.userId, title, body, url: `/user/orders` })
+          });
+        } catch (err) { console.warn('Error mandando push:', err); }
+      }
+    }
+  };
+
 
   const closeApp = () => { setSelectedApp(null); setShowMenu(true); setShowAddDish(false); setEditingDishId(null); setActiveMenuId(null); setDishToDelete(null); };
 
@@ -173,6 +198,27 @@ export default function OrderReceptionManager() {
     setIsSaving(false);
   };
 
+
+  const sendCancelRequest = async () => {
+    if (!cancelReqOrder) return;
+    const reason = cancelReason === 'Otro' ? (cancelOtherText.trim() || 'Otro') : cancelReason;
+    setSendingCancelReq(true);
+    try {
+      await updateDoc(doc(db, 'orders', cancelReqOrder.id), {
+        cancelRequest: {
+          reason,
+          requestedAt: serverTimestamp(),
+          status: 'pending',
+          restaurantName: myBusiness?.businessName || '',
+        },
+      });
+      setCancelReqOrder(null);
+      setCancelReason('Producto agotado');
+      setCancelOtherText('');
+    } catch (e) { console.error(e); }
+    setSendingCancelReq(false);
+  };
+
   const salesStats = useMemo(() => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -198,6 +244,37 @@ export default function OrderReceptionManager() {
   };
 
   if (!myBusiness) return <div style={{ background: '#F8F9FA', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChefHat className="animate-spin" color="#FF5722" /></div>;
+
+  const sendTestOrder = async () => {
+    const testItems = [
+      { name: 'Churrasco Completo', price: 8.50, quantity: 1, category: 'Main' },
+      { name: 'Jugo Natural Grande', price: 2.00, quantity: 2, category: 'Drinks' },
+    ];
+    const subtotal = testItems.reduce((s, i) => s + i.price * i.quantity, 0);
+    const deliveryFee = 1.81;
+    try {
+      await addDoc(collection(db, 'orders'), {
+        userId: 'test-user-001',
+        customerName: 'Cliente Test 🧪',
+        phone: '0991234567',
+        address: myBusiness.address || 'Av. de las Américas, Guayaquil',
+        restaurantId: myBusiness.userId || user?.uid,
+        restaurantName: myBusiness.businessName,
+        items: testItems,
+        subtotal: subtotal.toFixed(2),
+        deliveryFee: deliveryFee.toFixed(2),
+        total: (subtotal + deliveryFee).toFixed(2),
+        status: 'paid',
+        paymentMethod: 'card',
+        createdAt: serverTimestamp(),
+        source: 'test',
+      });
+      alert('✅ Pedido test enviado a Firestore — revisa /live');
+    } catch (err) {
+      console.error(err);
+      alert('❌ Error al enviar pedido test');
+    }
+  };
 
   const filteredOrders = orders.filter(o => activeTab === 'all' ? true : activeTab === 'new' ? (!o.status || o.status === 'paid') : (o.status === activeTab || (activeTab === 'history' && o.status === 'dispatched') || (activeTab === 'cancelled' && o.status === 'cancelled')));
   const tabCount = (s: string) => orders.filter(o => s === 'all' ? true : s === 'new' ? (!o.status || o.status === 'paid') : (s === 'history' ? o.status === 'dispatched' : s === 'cancelled' ? o.status === 'cancelled' : o.status === s)).length;
@@ -258,6 +335,20 @@ export default function OrderReceptionManager() {
         </nav>
         
         <div style={{ padding: '24px' }}>
+          {/* TEST LIVE */}
+          <button
+            onClick={sendTestOrder}
+            style={{
+              width: '100%', padding: '10px', borderRadius: '10px',
+              background: 'linear-gradient(135deg, #FF6A00, #F59E0B)',
+              border: 'none', color: 'white', fontWeight: 900,
+              fontSize: '11px', letterSpacing: '0.08em', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+              boxShadow: '0 4px 16px rgba(255,106,0,0.35)', marginBottom: '12px',
+            }}
+          >
+            🧪 TEST LIVE
+          </button>
           <Link href="/kitchen" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid #2A2D34', padding: '12px 20px', borderRadius: '8px', color: '#FFFFFF', fontWeight: 800, fontSize: '14px', cursor: 'pointer', textDecoration: 'none', marginBottom: '16px', transition: 'background 0.2s' }}>
             <Monitor size={18} color="#FF6A00" /> Pantalla Cocina
           </Link>
@@ -265,6 +356,7 @@ export default function OrderReceptionManager() {
             <X size={18} /> Cerrar Sesión
           </button>
         </div>
+
       </aside>
 
       {/* MAIN CONTENT AREA */}
@@ -283,9 +375,39 @@ export default function OrderReceptionManager() {
               <form onSubmit={saveSettings} style={{ padding: '32px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 <input type="text" value={myBusiness.businessName} placeholder={t.settings.businessName} onChange={e => setMyBusiness({ ...myBusiness, businessName: e.target.value })} style={{ width: '100%', padding: '14px', borderRadius: '4px', border: '1px solid #E9EDF7', fontWeight: 700 }} />
                 <input type="text" value={myBusiness.phone || ''} placeholder={t.settings.phone} onChange={e => setMyBusiness({ ...myBusiness, phone: e.target.value })} style={{ width: '100%', padding: '14px', borderRadius: '4px', border: '1px solid #E9EDF7', fontWeight: 700 }} />
-                <input type="text" value={myBusiness.address || ''} placeholder={t.settings.address} onChange={e => setMyBusiness({ ...myBusiness, address: e.target.value })} style={{ gridColumn: 'span 2', padding: '14px', borderRadius: '4px', border: '1px solid #E9EDF7', fontWeight: 700 }} />
-                <input type="text" value={myBusiness.country || ''} placeholder={t.settings.country} onChange={e => setMyBusiness({ ...myBusiness, country: e.target.value })} style={{ width: '100%', padding: '14px', borderRadius: '4px', border: '1px solid #E9EDF7', fontWeight: 700 }} />
-                <input type="text" value={myBusiness.city || ''} placeholder={t.settings.city} onChange={e => setMyBusiness({ ...myBusiness, city: e.target.value })} style={{ width: '100%', padding: '14px', borderRadius: '4px', border: '1px solid #E9EDF7', fontWeight: 700 }} />
+                <div style={{ gridColumn: 'span 2' }}>
+                  <AddressAutocomplete
+                    initialValue={myBusiness.address || ''}
+                    placeholder={t.settings.address}
+                    city={myBusiness.city || ''}
+                    onAddressSelect={(addr, coords) => {
+                      setMyBusiness({ 
+                        ...myBusiness, 
+                        address: addr,
+                        location: coords ? { lat: coords[0], lng: coords[1] } : myBusiness.location
+                      });
+                    }}
+                  />
+                </div>
+                {/* País fijo: Ecuador */}
+                <div style={{ padding: '14px', borderRadius: '4px', border: '1px solid #E9EDF7', fontWeight: 700, background: '#F9FAFB', color: '#6B7280', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🇪🇨</span> Ecuador
+                </div>
+                {/* Ciudad: lista de ciudades ecuatorianas */}
+                <select
+                  value={myBusiness.city || ''}
+                  onChange={e => setMyBusiness({ ...myBusiness, city: e.target.value, country: 'Ecuador' })}
+                  style={{ padding: '14px', borderRadius: '4px', border: '1px solid #E9EDF7', fontWeight: 700, color: myBusiness.city ? '#111' : '#9CA3AF' }}
+                >
+                  <option value="">{t.settings.city}</option>
+                  {[
+                    'Guayaquil','Quito','Cuenca','Santo Domingo','Machala',
+                    'Durán','Manta','Portoviejo','Loja','Ambato',
+                    'Esmeraldas','Quevedo','Riobamba','Milagro','Ibarra',
+                    'Babahoyo','Sangolquí','Latacunga','Tulcán','Azogues',
+                    'Salinas','Libertad','Daule','Samborondón','Nueva Loja'
+                  ].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
                 <select value={myBusiness.language || 'Spanish'} onChange={e => setMyBusiness({ ...myBusiness, language: e.target.value })} style={{ gridColumn: 'span 2', padding: '14px', borderRadius: '4px', border: '1px solid #E9EDF7', fontWeight: 700 }}>
                   <option value="Spanish">Español</option><option value="English">English</option>
                 </select>
@@ -576,6 +698,76 @@ export default function OrderReceptionManager() {
         )}
       </AnimatePresence>
 
+      {/* CANCEL REQUEST MODAL */}
+      <AnimatePresence>
+        {cancelReqOrder && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+            onClick={() => setCancelReqOrder(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9 }}
+              style={{ background: 'white', border: `1px solid #E9EAEC`, borderRadius: '24px', width: '100%', maxWidth: '420px', padding: '32px' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ width: '48px', height: '48px', background: '#EF444415', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px', color: '#EF4444' }}>
+                <AlertTriangle size={24} />
+              </div>
+              <h3 style={{ margin: '0 0 8px', fontSize: '20px', fontWeight: 900, color: '#111827' }}>Solicitar Cancelación</h3>
+              <p style={{ margin: '0 0 24px', fontSize: '13px', color: '#6B7280', lineHeight: 1.5 }}>
+                El pedido <b>#{cancelReqOrder.id.slice(0,6).toUpperCase()}</b> requiere autorización del Centro LIVE para ser cancelado. Selecciona el motivo:
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+                {['Producto agotado', 'Local cerrado', 'Driver no llegó', 'Otro'].map(r => (
+                  <button
+                    key={r}
+                    onClick={() => setCancelReason(r)}
+                    style={{
+                      padding: '14px 16px', background: cancelReason === r ? '#EF444410' : '#F7F7F8', border: `2px solid ${cancelReason === r ? '#EF4444' : 'transparent'}`,
+                      borderRadius: '12px', textAlign: 'left', fontWeight: 700, fontSize: '14px', color: cancelReason === r ? '#EF4444' : '#111827', cursor: 'pointer'
+                    }}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+
+              {cancelReason === 'Otro' && (
+                <div style={{ marginBottom: '24px' }}>
+                  <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 800, color: '#111827' }}>Especificar otro motivo:</p>
+                  <input
+                    type="text"
+                    value={cancelOtherText}
+                    onChange={e => setCancelOtherText(e.target.value)}
+                    placeholder="Escribe el motivo..."
+                    autoFocus
+                    style={{ width: '100%', padding: '14px', background: '#F7F7F8', border: 'none', borderRadius: '12px', outline: 'none', fontSize: '14px', fontWeight: 600 }}
+                  />
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={sendCancelRequest}
+                  disabled={sendingCancelReq || (cancelReason === 'Otro' && !cancelOtherText.trim())}
+                  style={{ flex: 1, padding: '16px', background: '#EF4444', color: 'white', border: 'none', borderRadius: '14px', fontWeight: 900, fontSize: '14px', cursor: 'pointer', opacity: sendingCancelReq ? 0.7 : 1 }}
+                >
+                  {sendingCancelReq ? 'Enviando...' : 'Enviar Solicitud'}
+                </button>
+                <button
+                  onClick={() => setCancelReqOrder(null)}
+                  style={{ padding: '16px 24px', background: 'transparent', color: '#6B7280', border: 'none', fontWeight: 800, fontSize: '14px', cursor: 'pointer' }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <main style={{ flex: 1, padding: '32px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
         {/* TOP STATUS BARS */}
@@ -671,9 +863,22 @@ export default function OrderReceptionManager() {
                         </span>
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        {order.status === 'new' && <button onClick={() => updateStatus(order.id, 'cooking')} style={{ padding: '10px 24px', background: '#FF6A00', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 12px rgba(255,106,0,0.2)' }}>Aceptar</button>}
+                        {(!order.status || order.status === 'paid' || order.status === 'new') && <button onClick={() => updateStatus(order.id, 'cooking')} style={{ padding: '10px 24px', background: '#FF6A00', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 12px rgba(255,106,0,0.2)' }}>Aceptar</button>}
                         {order.status === 'cooking' && <button onClick={() => updateStatus(order.id, 'ready')} style={{ padding: '10px 24px', background: '#22C55E', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 12px rgba(34,197,94,0.2)' }}>Listo</button>}
                         {order.status === 'ready' && <button onClick={() => updateStatus(order.id, 'dispatched')} style={{ padding: '10px 20px', background: '#8B5CF6', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 12px rgba(139,92,246,0.2)' }}>Entregado</button>}
+                        {/* Cancel request — only for active orders without pending request */}
+                        {['paid','cooking','ready'].includes(order.status || 'paid') && !order.cancelRequest && (
+                          <button
+                            onClick={() => { setCancelReqOrder(order); setCancelReason('Producto agotado'); setCancelOtherText(''); }}
+                            style={{ padding: '10px 14px', background: 'transparent', color: '#EF4444', border: '1px solid #EF444440', borderRadius: '12px', fontWeight: 800, fontSize: '12px', cursor: 'pointer' }}
+                            title="Solicitar cancelación"
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                        {order.cancelRequest?.status === 'pending' && (
+                          <span style={{ padding: '6px 10px', background: '#EF444415', color: '#EF4444', border: '1px solid #EF444430', borderRadius: '10px', fontSize: '11px', fontWeight: 800 }}>⏳ Solicitud enviada</span>
+                        )}
                       </div>
                     </div>
                   </div>
