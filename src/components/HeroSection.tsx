@@ -1,0 +1,209 @@
+'use client';
+import { motion } from 'framer-motion';
+import { MapPin, ArrowRight, Clock, Bike, Store } from 'lucide-react';
+import Link from 'next/link';
+
+const stats = [
+  { icon: <Clock size={15} />, label: 'Entrega en 25–35 min', sub: 'Promedio en tu zona' },
+  { icon: <Bike size={15} />, label: 'Envío Gratis', sub: 'En pedidos desde $10' },
+  { icon: <Store size={15} />, label: '+2,500 Restaurantes', sub: 'En toda la ciudad' },
+];
+
+export default function HeroSection() {
+  return (
+    <section id="hero" style={{
+      background: '#111111',
+      paddingTop: '64px',
+      minHeight: '580px',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+
+      {/* ── 1. Rider image: positioned bottom-right, sized by HEIGHT ── */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/hero-rider.png"
+        alt=""
+        style={{
+          position: 'absolute',
+          top: '50%',
+          right: 0,
+          transform: 'translateY(-50%)',
+          width: '62%',        /* adjusted for better balance */
+          height: 'auto',
+          display: 'block',
+          zIndex: 1,
+          userSelect: 'none',
+          pointerEvents: 'none',
+          /* Sharper fade on the left edge so the moto (on the left of the image) stays visible */
+          WebkitMaskImage: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.4) 5%, black 12%)',
+          maskImage: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.4) 5%, black 12%)',
+        }}
+      />
+
+      {/* ── 2. Gradient overlays ── */}
+
+      {/* Left fade: solid dark on the text side, fades to transparent */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 2,
+        pointerEvents: 'none',
+        background: `linear-gradient(
+          to right,
+          #111111 0%,
+          #111111 30%,
+          rgba(17,17,17,0.8) 50%,
+          rgba(17,17,17,0.3) 70%,
+          transparent 85%
+        )`,
+      }} />
+
+      {/* Orange ambient glow behind the rider */}
+      <div style={{
+        position: 'absolute',
+        top: '50%', right: '15%',
+        transform: 'translateY(-50%)',
+        width: '500px', height: '400px',
+        borderRadius: '50%',
+        background: 'radial-gradient(ellipse, rgba(255,87,34,0.15) 0%, transparent 70%)',
+        zIndex: 2,
+        pointerEvents: 'none',
+      }} />
+
+      {/* Bottom fade: dark ← transparent (blends into next section) */}
+      <div style={{
+        position: 'absolute',
+        bottom: 0, left: 0, right: 0,
+        height: '160px',
+        zIndex: 2,
+        pointerEvents: 'none',
+        background: 'linear-gradient(to top, #111111 0%, transparent 100%)',
+      }} />
+
+      {/* Top fade: covers navbar edge */}
+      <div style={{
+        position: 'absolute',
+        top: 0, left: 0, right: 0,
+        height: '60px',
+        zIndex: 2,
+        pointerEvents: 'none',
+        background: 'linear-gradient(to bottom, #111111 0%, transparent 100%)',
+      }} />
+
+      {/* Right-edge fade: keeps far-right from looking cut off */}
+      <div style={{
+        position: 'absolute',
+        top: 0, bottom: 0, right: 0,
+        width: '80px',
+        zIndex: 2,
+        pointerEvents: 'none',
+        background: 'linear-gradient(to left, #111111 0%, transparent 100%)',
+      }} />
+
+      {/* ── 3. Content: z-index 3 — above image + gradients ── */}
+      <div style={{
+        maxWidth: '1280px',
+        margin: '0 auto',
+        padding: '0 40px',
+        position: 'relative',
+        zIndex: 3,
+        display: 'flex',
+        alignItems: 'center',
+        minHeight: '516px',
+      }}>
+        <div style={{ maxWidth: '530px', paddingTop: '48px', paddingBottom: '72px' }}>
+
+          {/* Badge */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(255,87,34,0.12)', border: '1px solid rgba(255,87,34,0.3)', borderRadius: '6px', padding: '5px 12px', marginBottom: '24px' }}>
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--orange)', boxShadow: '0 0 8px var(--orange)' }} />
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,167,53,0.95)', letterSpacing: '0.3px' }}>
+              Disponible en todo Ecuador
+            </span>
+          </motion.div>
+
+          {/* Headline */}
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.08 }}
+            style={{
+              fontFamily: 'Outfit, sans-serif',
+              fontSize: 'clamp(40px, 5.5vw, 68px)',
+              fontWeight: 900,
+              lineHeight: 1.05,
+              letterSpacing: '-2.5px',
+              color: 'white',
+              marginBottom: '20px',
+            }}>
+            Tu comida favorita,<br />
+            <span style={{
+              background: 'linear-gradient(135deg, #FF5722 0%, #FF8A65 60%, #FFB347 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}>
+              rápida y segura.
+            </span>
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.4 }}
+            style={{ fontSize: '16px', color: 'rgba(255,255,255,0.5)', marginBottom: '32px', lineHeight: 1.65 }}>
+            Pide en minutos. Recibe en la puerta de tu casa.
+          </motion.p>
+
+          {/* Search bar */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.27, duration: 0.4 }}
+            style={{
+              display: 'flex',
+              background: 'white',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06)',
+              marginBottom: '20px',
+            }}>
+            <div style={{ display: 'flex', alignItems: 'center', flex: 1, padding: '0 16px', gap: '10px' }}>
+              <MapPin size={17} color="var(--orange)" style={{ flexShrink: 0 }} />
+              <input
+                type="text"
+                placeholder="Ingresa tu dirección de entrega..."
+                style={{
+                  flex: 1, border: 'none', outline: 'none',
+                  fontSize: '14px', color: 'var(--text-dark)',
+                  padding: '15px 0', background: 'transparent',
+                  fontFamily: 'Inter, sans-serif',
+                }}
+              />
+            </div>
+            <Link href="/login" className="btn-orange" style={{ margin: '6px', padding: '11px 22px', borderRadius: '8px', fontSize: '14px', flexShrink: 0, gap: '7px', border: 'none', cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
+              Buscar Comida <ArrowRight size={15} />
+            </Link>
+          </motion.div>
+
+          {/* Stats pills */}
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.38 }}
+            style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {stats.map((s, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: '7px',
+                padding: '7px 12px',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.09)',
+                borderRadius: '8px',
+              }}>
+                <span style={{ color: 'var(--orange)', display: 'flex', flexShrink: 0 }}>{s.icon}</span>
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'white', lineHeight: 1.2 }}>{s.label}</div>
+                  <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', lineHeight: 1.2, marginTop: '1px' }}>{s.sub}</div>
+                </div>
+              </div>
+            ))}
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}
