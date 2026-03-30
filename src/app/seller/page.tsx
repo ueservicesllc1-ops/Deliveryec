@@ -922,13 +922,13 @@ export default function OrderReceptionManager() {
                           </button>
                         )}
                         {/* Cancel request — only for non-terminal active orders */}
-                        {['created','accepted','preparing'].includes(oStatus) && !order.cancelRequest && (
+                        {['created','accepted','preparing','ready_for_pickup'].includes(oStatus) && !order.cancelRequest && (
                           <button
                             onClick={() => { setCancelReqOrder(order); setCancelReason('Producto agotado'); setCancelOtherText(''); }}
-                            style={{ padding: '10px 14px', background: 'transparent', color: '#EF4444', border: '1px solid #EF444440', borderRadius: '12px', fontWeight: 800, fontSize: '12px', cursor: 'pointer' }}
-                            title="Solicitar cancelación"
+                            style={{ padding: '10px 16px', background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', borderRadius: '12px', fontWeight: 800, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            title="Solicitar cancelación al administrador"
                           >
-                            <X size={14} />
+                            <X size={16} strokeWidth={3} /> Cancelar
                           </button>
                         )}
                         {order.cancelRequest?.status === 'pending' && (
