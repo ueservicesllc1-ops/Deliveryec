@@ -393,7 +393,25 @@ export default function DriverApp() {
           <AnimatePresence>
             {online && showMap && (
               <motion.div initial={{ height: 0 }} animate={{ height: 300 }} exit={{ height: 0 }} style={{ overflow: 'hidden', flexShrink: 0 }}>
-                <LiveMap driverPosition={myPos} customerPosition={customerPos} zoom={15} />
+                {customerPos ? (
+                  <LiveMap driverPosition={myPos} customerPosition={customerPos} zoom={15} />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', background: '#1a1a1e', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                    <MapPin size={32} color="#FF5722" />
+                    <p style={{ margin: 0, color: '#888', fontSize: '13px', fontWeight: 700, textAlign: 'center', padding: '0 24px' }}>
+                      {activeOrder?.address || 'Dirección no disponible'}
+                    </p>
+                    {activeOrder?.address && (
+                      <a 
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(activeOrder.address)}`}
+                        target="_blank" rel="noreferrer"
+                        style={{ background: '#FF5722', color: 'white', padding: '8px 20px', borderRadius: '12px', fontSize: '12px', fontWeight: 900, textDecoration: 'none' }}
+                      >
+                        Abrir en Google Maps
+                      </a>
+                    )}
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

@@ -162,6 +162,52 @@ export default function AddressAutocomplete({ onAddressSelect, placeholder, init
     setNomSuggestions([]);
   };
 
+  const useGPS = () => {
+    if (!navigator.geolocation) {
+      alert('Tu navegador no soporta geolocalización');
+      return;
+    }
+    setLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          // Use Google Geocoder if possible, else nominatim
+          if ((window as any).google?.maps?.Geocoder) {
+            const geocoder = new (window as any).google.maps.Geocoder();
+            geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results: any[], status: string) => {
+              setLoading(false);
+              if (status === 'OK' && results?.[0]) {
+                const addr = results[0].formatted_address;
+                setQuery(addr);
+                onAddressSelect(addr, [latitude, longitude]);
+              } else {
+                setQuery(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+                onAddressSelect(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`, [latitude, longitude]);
+              }
+            });
+          } else {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
+            const data = await res.json();
+            setLoading(false);
+            const addr = data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+            setQuery(addr);
+            onAddressSelect(addr, [latitude, longitude]);
+          }
+        } catch (e) {
+          setLoading(false);
+          setQuery(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+          onAddressSelect(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`, [latitude, longitude]);
+        }
+      },
+      (err) => {
+        setLoading(false);
+        alert('Error al obtener tu ubicación. Por favor escríbela manualmente.');
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+  };
+
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <div style={{
@@ -177,7 +223,14 @@ export default function AddressAutocomplete({ onAddressSelect, placeholder, init
           ref={inputRef}
           type="text"
           value={query}
-          onChange={e => setQuery(e.target.value)}
+          onChange={e => {
+            const val = e.target.value;
+            setQuery(val);
+            // Allow manual typing to count as the address
+            if (val.length > 5) {
+              onAddressSelect(val);
+            }
+          }}
           placeholder={loading ? 'Cargando buscador...' : (placeholder || 'Escribe tu dirección...')}
           disabled={loading}
           autoComplete="off"
@@ -186,8 +239,20 @@ export default function AddressAutocomplete({ onAddressSelect, placeholder, init
             fontSize: '14px', fontWeight: 600, color: '#111', minWidth: 0,
           }}
         />
+        <button 
+          type="button" 
+          onClick={useGPS}
+          title="Usar mi ubicación actual"
+          style={{ 
+            background: '#F0FDF4', border: 'none', borderRadius: '8px', 
+            width: '32px', height: '32px', display: 'flex', alignItems: 'center', 
+            justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s'
+          }}
+        >
+          <MapPin size={16} color="#16A34A" fill="#16A34A" />
+        </button>
         {query && (
-          <button type="button" onClick={() => { setQuery(''); setShowNom(false); }}
+          <button type="button" onClick={() => { setQuery(''); setShowNom(false); onAddressSelect(''); }}
             style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#CBD5E1', flexShrink: 0 }}>
             <X size={16} />
           </button>

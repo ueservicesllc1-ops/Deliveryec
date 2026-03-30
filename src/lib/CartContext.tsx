@@ -16,7 +16,8 @@ interface CartContextType {
   cart: CartItem[];
   restaurantId: string | null;
   restaurantName: string | null;
-  addToCart: (item: CartItem, restaurant: { id: string, name: string }) => void;
+  restaurantOwnerId: string | null;
+  addToCart: (item: CartItem, restaurant: { id: string, name: string, ownerId?: string }) => void;
   removeFromCart: (itemId: string) => void;
   clearCart: () => void;
   cartCount: number;
@@ -29,6 +30,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [restaurantName, setRestaurantName] = useState<string | null>(null);
+  const [restaurantOwnerId, setRestaurantOwnerId] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('deliveryy_cart');
@@ -38,27 +40,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setCart(parsed.cart || []);
         setRestaurantId(parsed.restaurantId || null);
         setRestaurantName(parsed.restaurantName || null);
+        setRestaurantOwnerId(parsed.restaurantOwnerId || null);
       } catch (e) { console.error('Error parsing cart', e); }
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('deliveryy_cart', JSON.stringify({ cart, restaurantId, restaurantName }));
-  }, [cart, restaurantId, restaurantName]);
+    localStorage.setItem('deliveryy_cart', JSON.stringify({ cart, restaurantId, restaurantName, restaurantOwnerId }));
+  }, [cart, restaurantId, restaurantName, restaurantOwnerId]);
 
-  const addToCart = (item: CartItem, restaurant: { id: string, name: string }) => {
-    // If adding from a different restaurant, clear previous cart? 
-    // Usually yes in food apps.
+  const addToCart = (item: CartItem, restaurant: { id: string, name: string, ownerId?: string }) => {
     if (restaurantId && restaurantId !== restaurant.id) {
        if (!confirm("Your cart from another restaurant will be cleared. Continue?")) return;
        setCart([{ ...item, qty: 1 }]);
        setRestaurantId(restaurant.id);
        setRestaurantName(restaurant.name);
+       setRestaurantOwnerId(restaurant.ownerId || null);
        return;
     }
-
     setRestaurantId(restaurant.id);
     setRestaurantName(restaurant.name);
+    setRestaurantOwnerId(restaurant.ownerId || null);
     
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id);
@@ -88,13 +90,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setCart([]);
     setRestaurantId(null);
     setRestaurantName(null);
+    setRestaurantOwnerId(null);
   };
 
   const cartCount = cart.reduce((acc, current) => acc + current.qty, 0);
   const subtotal = cart.reduce((acc, current) => acc + (current.price * current.qty), 0);
 
   return (
-    <CartContext.Provider value={{ cart, restaurantId, restaurantName, addToCart, removeFromCart, clearCart, cartCount, subtotal }}>
+    <CartContext.Provider value={{ cart, restaurantId, restaurantName, restaurantOwnerId, addToCart, removeFromCart, clearCart, cartCount, subtotal }}>
+
       {children}
     </CartContext.Provider>
   );

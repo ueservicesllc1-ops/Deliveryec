@@ -79,15 +79,17 @@ export const DRIVER_ACTIVE_STATUSES: OrderStatus[] = [
 // ── Valid transitions ─────────────────────────────────────────────────────────
 // Panel → nextStatus
 export const SELLER_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus>> = {
-  created:          'accepted',      // Seller accepts order
-  accepted:         'preparing',     // Seller sends to kitchen
-  preparing:        'ready_for_pickup', // Kitchen marks ready (also done from KDS)
-  driver_arrived:   'picked_up',     // Seller confirms handoff to driver
+  created:          'accepted',          // Seller ONLY accepts the order
+  // NO 'accepted' -> 'preparing' transition here because the Chef/Kitchen does that.
+  preparing:        'ready_for_pickup',  // Kitchen or Seller can mark ready
+  ready_for_pickup: 'on_the_way',        // Seller dispatches manually (no driver)
+  driver_arrived:   'picked_up',         // Seller confirms handoff
+  on_the_way:       'delivered',         // Manual delivery confirmation
 };
 
 export const KDS_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus>> = {
-  accepted:   'preparing',        // KDS marks as being cooked
-  preparing:  'ready_for_pickup', // KDS marks as ready → triggers driver broadcast
+  accepted:   'preparing',        // Chef starts cooking
+  preparing:  'ready_for_pickup', // Chef marks as ready → triggers driver broadcast
 };
 
 export const DRIVER_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus>> = {

@@ -75,32 +75,55 @@ export default function OrderReceptionManager() {
 
   const t = TRANSLATIONS[myBusiness?.language || 'Spanish'];
 
+  // ── 1. Load business & redirect if not found ──
   useEffect(() => {
     if (!user) {
-      // Si no hay usuario y ya pasó el tiempo de carga del AuthContext, mandar a login
-      const timeout = setTimeout(() => {
-        if (!user) router.push('/login');
-      }, 2000);
+      const timeout = setTimeout(() => { if (!user) router.push('/login'); }, 2000);
       return () => clearTimeout(timeout);
     }
-
-    const fetchBusiness = async () => {
-      // Buscamos cualquier solicitud del usuario (aprobada o no para no quedarnos bloqueados)
-      const q = query(collection(db, 'business_requests'), where('userId', '==', user.uid));
-      const snap = await getDocs(q);
+    const q = query(collection(db, 'business_requests'), where('userId', '==', user.uid));
+    getDocs(q).then(snap => {
       if (!snap.empty) {
         setMyBusiness({ id: snap.docs[0].id, ...snap.docs[0].data() });
       } else {
-        // Si no tiene negocio, mandarlo a registro
         router.push('/order/register-business');
       }
-    };
-    fetchBusiness();
-
-    const unsub1 = onSnapshot(query(collection(db, 'orders')), (snap) => setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsub2 = onSnapshot(query(collection(db, 'products')), (snap) => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    return () => { unsub1(); unsub2(); };
+    });
   }, [user]);
+
+  // ── 2. Subscribe to orders & products once both uid and businessId are known ──
+  // Stable single-key dependency avoids React's "array size changed" HMR error
+  const subKey = user?.uid && myBusiness?.id ? `${user.uid}_${myBusiness.id}` : null;
+
+  useEffect(() => {
+    if (!subKey || !user?.uid || !myBusiness?.id) return;
+
+    // Primary: filter by restaurantOwnerId (seller's Firebase UID) — most reliable
+    const q1 = query(collection(db, 'orders'), where('restaurantOwnerId', '==', user.uid));
+    // Fallback: filter by restaurantId (document ID) — covers legacy orders
+    const q2 = query(collection(db, 'orders'), where('restaurantId', '==', myBusiness.id));
+
+    const allOrders = new Map<string, any>();
+    const flush = () => setOrders(Array.from(allOrders.values()));
+
+    const unsub1 = onSnapshot(q1, (snap) => {
+      snap.docs.forEach(d => allOrders.set(d.id, { id: d.id, ...d.data() }));
+      flush();
+    });
+    const unsub2 = onSnapshot(q2, (snap) => {
+      snap.docs.forEach(d => allOrders.set(d.id, { id: d.id, ...d.data() }));
+      flush();
+    });
+
+    const productsQuery = query(collection(db, 'products'), where('businessId', '==', myBusiness.id));
+    const unsub3 = onSnapshot(productsQuery, (snap) =>
+      setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+
+    return () => { unsub1(); unsub2(); unsub3(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subKey]);
+
 
   // ── Advance order to the next seller-side state ──
   const updateStatus = async (id: string, nextStatus: OrderStatus) => {
@@ -844,7 +867,14 @@ export default function OrderReceptionManager() {
               ) as OrderStatus;
               const oColor   = STATUS_COLORS[oStatus]  || '#F59E0B';
               const oTitle   = STATUS_LABELS[oStatus]  || 'Nuevo';
-              const sellerNext = SELLER_TRANSITIONS[oStatus];
+              let sellerNext = SELLER_TRANSITIONS[oStatus];
+              // If a driver is assigned, the seller should NOT manually dispatch or deliver.
+              // They ONLY do the handoff to the driver (driver_arrived -> picked_up).
+              if (order.assignedDriverId) {
+                if (sellerNext === 'on_the_way' || sellerNext === 'delivered') {
+                  sellerNext = undefined;
+                }
+              }
               
               return (
                 <motion.div key={`order-${order.id || idx}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', border: `1px solid ${oColor}22` }}>
@@ -881,7 +911,7 @@ export default function OrderReceptionManager() {
                     </div>
 
                     {/* ── DRIVER BADGE — always shown when assigned, NEVER hidden ── */}
-                    {order.assignedDriverId && (
+                    {order.assignedDriverId ? (
                       <div style={{ marginBottom: '12px', padding: '10px 14px', background: '#EFF6FF', borderRadius: '10px', border: '1px solid #BFDBFE', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Bike size={14} color="#3B82F6" />
                         <span style={{ fontSize: '12px', fontWeight: 800, color: '#1E40AF' }}>
@@ -890,7 +920,15 @@ export default function OrderReceptionManager() {
                         </span>
                         <div style={{ marginLeft: 'auto', width: '8px', height: '8px', borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 6px #22C55E' }} />
                       </div>
-                    )}
+                    ) : (oStatus === 'ready_for_pickup') ? (
+                      <div style={{ marginBottom: '12px', padding: '10px 14px', background: '#FFF7ED', borderRadius: '10px', border: '1px solid #FED7AA', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Bike size={14} color="#F97316" />
+                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#C2410C' }}>
+                          Esperando asignación de driver...
+                        </span>
+                        <div style={{ marginLeft: 'auto', width: '8px', height: '8px', borderRadius: '50%', background: '#F97316', animation: 'spin 2s linear infinite' }} />
+                      </div>
+                    ) : null}
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
                       {order.items?.map((item: any, i: number) => (
@@ -914,12 +952,19 @@ export default function OrderReceptionManager() {
                             onClick={() => updateStatus(order.id, sellerNext)}
                             style={{ padding: '10px 20px', background: STATUS_COLORS[sellerNext], color: 'white', border: 'none', borderRadius: '12px', fontWeight: 900, cursor: 'pointer', fontSize: '13px' }}
                           >
-                            {sellerNext === 'accepted'         ? 'Aceptar' :
-                             sellerNext === 'preparing'        ? 'A cocina' :
-                             sellerNext === 'ready_for_pickup' ? 'Marcar listo' :
-                             sellerNext === 'picked_up'        ? 'Entregar al driver' :
-                             STATUS_LABELS[sellerNext]}
+                          {sellerNext === 'accepted'         ? '✅ Aceptar pedido' :
+                           sellerNext === 'preparing'        ? '👨‍🍳 A cocina' :
+                           sellerNext === 'ready_for_pickup' ? '🔔 Marcar listo' :
+                           sellerNext === 'on_the_way'       ? '🛵 Despachar sin driver' :
+                           sellerNext === 'picked_up'        ? '🤝 Entregar al driver' :
+                           sellerNext === 'delivered'        ? '✅ Confirmar entrega' :
+                           STATUS_LABELS[sellerNext]}
                           </button>
+                        )}
+                        {!sellerNext && oStatus === 'accepted' && (
+                          <span style={{ fontSize: '13px', fontWeight: 800, color: '#FF6A00', padding: '10px 0', border: '1px solid #FF6A0033', borderRadius: '12px', paddingLeft: '16px', paddingRight: '16px', background: '#FF6A0011' }}>
+                            ⏳ Esperando al chef...
+                          </span>
                         )}
                         {/* Cancel request — only for non-terminal active orders */}
                         {['created','accepted','preparing','ready_for_pickup'].includes(oStatus) && !order.cancelRequest && (
