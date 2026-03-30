@@ -63,12 +63,22 @@ const SUB   = '#5A6070';
 const MUTED = '#1E2128';
 
 const STATUS: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-  paid:       { label: 'Nuevo',      color: '#F59E0B', bg: '#F59E0B18', icon: <Package size={14}/> },
-  cooking:    { label: 'Cocina',     color: '#FF6A00', bg: '#FF6A0018', icon: <ChefHat size={14}/> },
-  ready:      { label: 'Listo',      color: '#22C55E', bg: '#22C55E18', icon: <CheckCircle2 size={14}/> },
-  dispatched: { label: 'Despachado', color: '#8B5CF6', bg: '#8B5CF618', icon: <Bike size={14}/> },
-  delivered:  { label: 'Entregado',  color: '#3B82F6', bg: '#3B82F618', icon: <CheckCircle2 size={14}/> },
-  cancelled:  { label: 'Cancelado',  color: '#EF4444', bg: '#EF444418', icon: <X size={14}/> },
+  created:          { label: 'Nuevo',      color: '#F59E0B', bg: '#F59E0B18', icon: <Package size={14}/> },
+  accepted:         { label: 'Aceptado',   color: '#3B82F6', bg: '#3B82F618', icon: <CheckCircle2 size={14}/> },
+  preparing:        { label: 'Cocina',     color: '#FF6A00', bg: '#FF6A0018', icon: <ChefHat size={14}/> },
+  ready_for_pickup: { label: 'Listo',      color: '#22C55E', bg: '#22C55E18', icon: <CheckCircle2 size={14}/> },
+  driver_assigned:  { label: 'Driver',     color: '#8B5CF6', bg: '#8B5CF618', icon: <Bike size={14}/> },
+  driver_arrived:   { label: 'En local',   color: '#8B5CF6', bg: '#8B5CF618', icon: <Bike size={14}/> },
+  picked_up:        { label: 'Retirado',   color: '#8B5CF6', bg: '#8B5CF618', icon: <Bike size={14}/> },
+  on_the_way:       { label: 'En Camino',  color: '#8B5CF6', bg: '#8B5CF618', icon: <Bike size={14}/> },
+  delivered:        { label: 'Entregado',  color: '#10B981', bg: '#10B98118', icon: <CheckCircle2 size={14}/> },
+  completed:        { label: 'Completado', color: '#10B981', bg: '#10B98118', icon: <CheckCircle2 size={14}/> },
+  cancelled:        { label: 'Cancelado',  color: '#EF4444', bg: '#EF444418', icon: <X size={14}/> },
+  // legacy fallbacks
+  paid:             { label: 'Nuevo',      color: '#F59E0B', bg: '#F59E0B18', icon: <Package size={14}/> },
+  cooking:          { label: 'Cocina',     color: '#FF6A00', bg: '#FF6A0018', icon: <ChefHat size={14}/> },
+  ready:            { label: 'Listo',      color: '#22C55E', bg: '#22C55E18', icon: <CheckCircle2 size={14}/> },
+  dispatched:       { label: 'En Camino',  color: '#8B5CF6', bg: '#8B5CF618', icon: <Bike size={14}/> },
 };
 
 function statusInfo(s: string) {
@@ -327,6 +337,8 @@ export default function LivePage() {
 
   const [orders, setOrders]   = useState<any[]>([]);
   const [filter, setFilter]   = useState('all');
+  const [filterRest, setFilterRest] = useState('all');
+  const [filterDriver, setFilterDriver] = useState('all');
   const [search, setSearch]   = useState('');
   const [selected, setSelected] = useState<any>(null);
   const [pulse, setPulse]     = useState(false);
@@ -454,30 +466,66 @@ export default function LivePage() {
 
 
   const filtered = orders.filter(o => {
-    const matchStatus = filter === 'all' || o.status === filter || (filter === 'paid' && !o.status);
+    // Normalization mapping
+    const legacyStatus = o.status || 'paid';
+    const oStatus = (
+        legacyStatus === 'paid' ? 'created' :
+        legacyStatus === 'new' ? 'created' :
+        legacyStatus === 'cooking' ? 'preparing' :
+        legacyStatus === 'ready' ? 'ready_for_pickup' :
+        legacyStatus === 'dispatched' ? 'on_the_way' :
+        legacyStatus
+    );
+
+    const matchStatus = filter === 'all' || 
+      (filter === 'created' && (oStatus === 'created' || oStatus === 'accepted')) ||
+      (filter === 'preparing' && oStatus === 'preparing') ||
+      (filter === 'ready' && oStatus === 'ready_for_pickup') ||
+      (filter === 'on_the_way' && ['driver_assigned','driver_arrived','picked_up','on_the_way'].includes(oStatus)) ||
+      (filter === 'delivered' && ['delivered','completed'].includes(oStatus)) ||
+      (filter === 'cancelled' && oStatus === 'cancelled');
+
+    const matchRest = filterRest === 'all' || o.restaurantName === filterRest;
+    const matchDriver = filterDriver === 'all' || o.driverName === filterDriver;
+
     const matchSearch = !search || 
       o.customerName?.toLowerCase().includes(search.toLowerCase()) ||
       o.restaurantName?.toLowerCase().includes(search.toLowerCase()) ||
+      o.driverName?.toLowerCase().includes(search.toLowerCase()) ||
       o.id.slice(0,6).toLowerCase().includes(search.toLowerCase());
-    return matchStatus && matchSearch;
+
+    return matchStatus && matchRest && matchDriver && matchSearch;
   });
+
+  const getMappedStatus = (raw: string) => {
+    const s = raw || 'paid';
+    if (s === 'paid' || s === 'new' || s === 'accepted') return 'created';
+    if (s === 'cooking') return 'preparing';
+    if (s === 'ready_for_pickup') return 'ready';
+    if (['driver_assigned','driver_arrived','picked_up','on_the_way','dispatched'].includes(s)) return 'on_the_way';
+    if (s === 'completed') return 'delivered';
+    return s;
+  };
 
   const counts: Record<string, number> = { all: orders.length };
   orders.forEach(o => {
-    const s = o.status || 'paid';
+    const s = getMappedStatus(o.status);
     counts[s] = (counts[s] || 0) + 1;
   });
   const issues = orders.filter(o => !!o.issue).length;
 
   const FILTERS = [
     { id: 'all',       label: 'Todos' },
-    { id: 'paid',      label: 'Nuevos' },
-    { id: 'cooking',   label: 'Cocina' },
+    { id: 'created',   label: 'Nuevos' },
+    { id: 'preparing', label: 'Cocina' },
     { id: 'ready',     label: 'Listos' },
-    { id: 'dispatched',label: 'Despachados' },
+    { id: 'on_the_way',label: 'En Camino' },
     { id: 'delivered', label: 'Entregados' },
     { id: 'cancelled', label: 'Cancelados' },
   ];
+
+  const restaurants = Array.from(new Set(orders.map(o => o.restaurantName).filter(Boolean))).sort() as string[];
+  const drivers = Array.from(new Set(orders.map(o => o.driverName).filter(Boolean))).sort() as string[];
 
   return (
     <div style={{ minHeight: '100dvh', background: BG, fontFamily: 'Inter, -apple-system, sans-serif', color: TEXT }}>
@@ -528,13 +576,33 @@ export default function LivePage() {
             </motion.div>
           )}
 
+          {/* Filters: Restaurant & Driver */}
+          <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
+            <select
+              value={filterRest}
+              onChange={e => setFilterRest(e.target.value)}
+              style={{ background: MUTED, border: `1px solid ${BORD}`, borderRadius: '10px', padding: '6px 10px', color: TEXT, fontSize: '12px', fontWeight: 600, outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="all">Todas las marcas</option>
+              {restaurants.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <select
+              value={filterDriver}
+              onChange={e => setFilterDriver(e.target.value)}
+              style={{ background: MUTED, border: `1px solid ${BORD}`, borderRadius: '10px', padding: '6px 10px', color: TEXT, fontSize: '12px', fontWeight: 600, outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="all">Todos los drivers</option>
+              {drivers.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+
           {/* Search */}
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <Search size={14} color={SUB} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar orden, cliente..."
-              style={{ background: MUTED, border: `1px solid ${BORD}`, borderRadius: '10px', padding: '7px 12px 7px 30px', color: TEXT, fontSize: '12px', fontWeight: 600, outline: 'none', width: '180px' }}
+              placeholder="Buscar (ej. Juan)..."
+              style={{ background: MUTED, border: `1px solid ${BORD}`, borderRadius: '10px', padding: '7px 12px 7px 30px', color: TEXT, fontSize: '12px', fontWeight: 600, outline: 'none', width: '150px' }}
             />
           </div>
         </div>
