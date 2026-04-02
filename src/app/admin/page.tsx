@@ -7,7 +7,7 @@ import {
   TrendingUp, Package, MoreVertical, Search, ShieldCheck, DollarSign,
   BarChart3, Settings, AlertTriangle, Eye, Trash2, Ban, Star,
   ChevronUp, ChevronDown, RefreshCw, LogOut, X, Filter, ChevronRight,
-  Mail, Clock, Activity, ArrowUpRight, ArrowDownRight, Layers, Delete,
+  Mail, Clock, Activity, ArrowUpRight, ArrowDownRight, Layers, Delete, Camera,
 } from 'lucide-react';
 import {
   collection, onSnapshot, query, doc, updateDoc, deleteDoc, getDoc, setDoc,
@@ -270,6 +270,10 @@ function AdminApp() {
   const [basePrepTime, setBasePrepTime] = useState(15); // base prep + delivery margin
   const [driverCommission, setDriverComm] = useState(30); // % Platform stays with
 
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'yesterday' | '7days' | 'custom'>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [confirmModal, setConfirmModal] = useState<{ action: () => Promise<void>; title: string; sub: string } | null>(null);
   const [saving, setSaving]           = useState(false);
 
@@ -447,9 +451,35 @@ function AdminApp() {
     !search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())
   ), [users, search]);
 
-  const ordersFiltered = useMemo(() => orders.filter(o =>
-    !search || o.customerName?.toLowerCase().includes(search.toLowerCase()) || o.restaurantName?.toLowerCase().includes(search.toLowerCase())
-  ), [orders, search]);
+  const ordersFiltered = useMemo(() => orders.filter(o => {
+    const matchSearch = !search || o.customerName?.toLowerCase().includes(search.toLowerCase()) || o.restaurantName?.toLowerCase().includes(search.toLowerCase()) || o.id?.toLowerCase().includes(search.toLowerCase());
+    
+    let matchDate = true;
+    if (dateFilter !== 'all') {
+      const oDate = o.createdAt?.seconds ? new Date(o.createdAt.seconds * 1000) : null;
+      if (!oDate) return false;
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      if (dateFilter === 'today') {
+        matchDate = oDate >= startOfToday;
+      } else if (dateFilter === 'yesterday') {
+        const startOfYesterday = new Date(startOfToday);
+        startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+        matchDate = oDate >= startOfYesterday && oDate < startOfToday;
+      } else if (dateFilter === '7days') {
+        const sevenDaysAgo = new Date(startOfToday);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        matchDate = oDate >= sevenDaysAgo;
+      } else if (dateFilter === 'custom' && startDate && endDate) {
+        const s = new Date(startDate); s.setHours(0,0,0,0);
+        const e = new Date(endDate); e.setHours(23,59,59,999);
+        matchDate = oDate >= s && oDate <= e;
+      }
+    }
+
+    return matchSearch && matchDate;
+  }), [orders, search, dateFilter, startDate, endDate]);
 
   // ΓöÇΓöÇ Chart data (last 7 days) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   const chartData = useMemo(() => {
@@ -531,7 +561,7 @@ function AdminApp() {
 
         {/* Scrollable content */}
         <main style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="popLayout">
 
             {/* ΓöÇΓöÇ OVERVIEW ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */}
             {tab === 'overview' && (
@@ -940,6 +970,38 @@ function AdminApp() {
               </motion.div>
             )}
 
+            {/* ── CONFIRM MODAL ────────────────────────────────────────── */}
+            <AnimatePresence>
+              {confirmModal && (
+                <motion.div
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+                  onClick={() => setConfirmModal(null)}
+                >
+                  <motion.div
+                    initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9 }}
+                    style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '24px', padding: '32px', maxWidth: '420px', width: '100%' }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <div style={{ width: '52px', height: '52px', background: `${C.yellow}18`, borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
+                      <AlertTriangle size={24} color={C.yellow} />
+                    </div>
+                    <h2 style={{ margin: '0 0 8px', fontSize: '20px', fontWeight: 900 }}>{confirmModal.title}</h2>
+                    <p style={{ margin: '0 0 28px', color: C.sub, fontSize: '14px', lineHeight: 1.5 }}>{confirmModal.sub}</p>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <button onClick={() => setConfirmModal(null)} style={{ flex: 1, padding: '14px', background: C.muted + '33', border: `1px solid ${C.border}`, borderRadius: '12px', color: C.sub, fontWeight: 700, cursor: 'pointer', fontSize: '14px' }}>
+                        Cancelar
+                      </button>
+                      <button onClick={runConfirm} disabled={saving} style={{ flex: 1, padding: '14px', background: C.accent, border: 'none', borderRadius: '12px', color: 'white', fontWeight: 900, cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        {saving ? <RefreshCw size={16} className="animate-spin" /> : <CheckCircle2 size={16}/>}
+                        Confirmar
+                      </button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* ── ORDERS ────────────────────────────────────────────────── */}
             {tab === 'orders' && (
               <motion.div key="orders" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
@@ -948,15 +1010,35 @@ function AdminApp() {
                     <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 900 }}>Registro Diario de Pedidos</h1>
                     <p style={{ margin: '4px 0 0', color: C.sub, fontSize: '13px' }}>{orders.length} pedidos · Revenue total: ${totalRevenue.toFixed(2)}</p>
                   </div>
-                  <div style={{ display: 'flex', gap: '16px' }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <select 
+                      value={dateFilter} 
+                      onChange={(e) => setDateFilter(e.target.value as any)}
+                      style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '8px 12px', color: C.text, fontSize: '12px', fontWeight: 700, outline: 'none' }}
+                    >
+                      <option value="all">Todas las fechas</option>
+                      <option value="today">Hoy</option>
+                      <option value="yesterday">Ayer</option>
+                      <option value="7days">Últimos 7 días</option>
+                      <option value="custom">Rango personalizado...</option>
+                    </select>
+
+                    {dateFilter === 'custom' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '6px 10px', color: C.text, fontSize: '11px' }} />
+                        <span style={{ color: C.sub }}>-</span>
+                        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '6px 10px', color: C.text, fontSize: '11px' }} />
+                      </div>
+                    )}
+
                     {[
                       { label: 'Hoy', value: today.length, color: C.accent },
                       { label: 'Con Driver', value: orders.filter((o:any)=>!!o.driverId).length, color: C.purple },
                       { label: 'Despachado', value: orders.filter((o:any)=>o.status==='dispatched'||o.status==='delivered').length, color: C.green },
                     ].map((s,i) => (
-                      <div key={i} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '12px', padding: '12px 18px', textAlign: 'center' }}>
+                      <div key={i} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '12px', padding: '10px 16px', textAlign: 'center' }}>
                         <p style={{ margin: 0, fontSize: '9px', color: C.sub, fontWeight: 700, textTransform: 'uppercase' }}>{s.label}</p>
-                        <p style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: s.color }}>{s.value}</p>
+                        <p style={{ margin: 0, fontSize: '18px', fontWeight: 900, color: s.color }}>{s.value}</p>
                       </div>
                     ))}
                   </div>
@@ -966,7 +1048,7 @@ function AdminApp() {
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
                       <thead>
                         <tr style={{ background: C.bg }}>
-                          {['ID', 'Fecha', 'Cliente', 'Restaurante', 'Total', 'Envío', 'Driver', 'Driver Gana', 'Plataforma', 'Estado'].map(h => (
+                          {['ID', 'Fecha', 'Cliente', 'Restaurante', 'Total', 'Envío', 'Driver', 'Estado', 'Detalle'].map(h => (
                             <th key={h} style={{ padding: '14px 14px', textAlign: 'left', fontSize: '10px', fontWeight: 800, color: C.sub, textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
                           ))}
                         </tr>
@@ -994,9 +1076,15 @@ function AdminApp() {
                                   : <span style={{ color: C.muted, fontSize: '11px' }}>Sin asignar</span>
                                 }
                               </td>
-                              <td style={{ padding: '11px 14px', fontWeight: 900, color: C.green, fontSize: '13px' }}>{dFee > 0 ? `$${driverPay.toFixed(2)}` : '—'}</td>
-                              <td style={{ padding: '11px 14px', fontWeight: 700, color: C.purple, fontSize: '13px' }}>{platCut > 0 ? `$${platCut.toFixed(2)}` : '—'}</td>
                               <td style={{ padding: '11px 14px' }}>{statusChip(o.status || 'pending')}</td>
+                              <td style={{ padding: '11px 14px' }}>
+                                <button 
+                                  onClick={() => setSelectedOrder(o)}
+                                  style={{ padding: '6px 10px', background: `${C.accent}15`, color: C.accent, border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                  <Eye size={14} /> <span style={{ fontSize: '11px', fontWeight: 800 }}>Ver</span>
+                                </button>
+                              </td>
                             </tr>
                           );
                         })}
@@ -1214,6 +1302,144 @@ function AdminApp() {
                   {saving ? <RefreshCw size={16} className="animate-spin" /> : <CheckCircle2 size={16}/>}
                   Confirmar
                 </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── ORDER DETAIL MODAL ────────────────────────────────────── */}
+      <AnimatePresence>
+        {selectedOrder && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 9500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+            onClick={() => setSelectedOrder(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95 }}
+              style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '28px', width: '100%', maxWidth: '850px', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div style={{ padding: '24px 32px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.surface }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900 }}>Orden #{selectedOrder.id.slice(0,8).toUpperCase()}</h2>
+                  <p style={{ margin: '4px 0 0', color: C.sub, fontSize: '12px' }}>
+                    {selectedOrder.createdAt?.seconds ? new Date(selectedOrder.createdAt.seconds * 1000).toLocaleString() : 'Sin fecha'}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  {statusChip(selectedOrder.status)}
+                  <button onClick={() => setSelectedOrder(null)} style={{ background: C.muted + '33', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: C.text }}><X size={20}/></button>
+                </div>
+              </div>
+
+              {/* Grid content */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', overflowY: 'auto', flex: 1 }}>
+                
+                {/* Left side: Info & Items */}
+                <div style={{ padding: '32px', borderRight: `1px solid ${C.border}` }}>
+                  {/* Stakeholders */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '32px' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 12px', fontSize: '11px', color: C.sub, fontWeight: 800, textTransform: 'uppercase' }}>Cliente</h4>
+                      <p style={{ margin: 0, fontWeight: 800, fontSize: '15px' }}>{selectedOrder.customerName}</p>
+                      <p style={{ margin: '4px 0 0', color: C.sub, fontSize: '13px' }}>{selectedOrder.customerPhone || 'Sin teléfono'}</p>
+                      <p style={{ margin: '8px 0 0', color: C.blue, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={12}/> {selectedOrder.address}</p>
+                    </div>
+                    <div>
+                      <h4 style={{ margin: '0 0 12px', fontSize: '11px', color: C.sub, fontWeight: 800, textTransform: 'uppercase' }}>Restaurante</h4>
+                      <p style={{ margin: 0, fontWeight: 800, fontSize: '15px' }}>{selectedOrder.restaurantName}</p>
+                      <p style={{ margin: '4px 0 0', color: C.sub, fontSize: '13px' }}>ID: {selectedOrder.restaurantId?.slice(0,8)}</p>
+                    </div>
+                  </div>
+
+                  {/* Items list */}
+                  <h4 style={{ margin: '0 0 16px', fontSize: '11px', color: C.sub, fontWeight: 800, textTransform: 'uppercase' }}>Items del Pedido</h4>
+                  <div style={{ background: C.bg, borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+                    {selectedOrder.items?.map((item: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <span style={{ background: `${C.accent}20`, color: C.accent, padding: '2px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 900 }}>{item.quantity}x</span>
+                          <span style={{ fontSize: '14px', fontWeight: 600 }}>{item.name}</span>
+                        </div>
+                        <span style={{ fontSize: '14px', fontWeight: 900 }}>${(Number(item.price || 0) * (item.quantity || 1)).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Pricing summary */}
+                  <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: C.sub }}>
+                      <span>Subtotal</span>
+                      <span style={{ color: C.text }}>${(Number(selectedOrder.subtotal || 0)).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px', color: C.sub }}>
+                      <span>Costo de Envío</span>
+                      <span style={{ color: C.blue }}>${(Number(selectedOrder.deliveryFee || 0)).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '12px', borderTop: `1px dashed ${C.border}` }}>
+                      <span style={{ fontWeight: 800, fontSize: '16px' }}>Total Pagado</span>
+                      <span style={{ fontWeight: 900, fontSize: '22px', color: C.accent }}>${(Number(selectedOrder.total || 0)).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right side: Evidence & Map */}
+                <div style={{ padding: '32px', background: '#0D0E12' }}>
+                  
+                  {/* Delivery Evidence Photo */}
+                  <h4 style={{ margin: '0 0 16px', fontSize: '11px', color: C.sub, fontWeight: 800, textTransform: 'uppercase' }}>Prueba de Entrega</h4>
+                  <div style={{ aspectRatio: '4/3', width: '100%', background: C.surface, borderRadius: '20px', overflow: 'hidden', border: `1px solid ${C.border}`, marginBottom: '24px', position: 'relative' }}>
+                    {selectedOrder.evidenceUrl ? (
+                      <a href={selectedOrder.evidenceUrl} target="_blank" rel="noreferrer">
+                        <img src={selectedOrder.evidenceUrl} alt="Prueba de entrega" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <div style={{ position: 'absolute', bottom: '12px', right: '12px', background: 'rgba(0,0,0,0.6)', color: 'white', padding: '4px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 700, backdropFilter: 'blur(4px)' }}>Click para ampliar</div>
+                      </a>
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', color: C.sub }}>
+                        <Camera size={32} opacity={0.3} />
+                        <span style={{ fontSize: '12px', fontWeight: 600 }}>Foto no disponible todavía</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Location Info */}
+                  <h4 style={{ margin: '0 0 16px', fontSize: '11px', color: C.sub, fontWeight: 800, textTransform: 'uppercase' }}>Ubicación de Destino</h4>
+                  <div style={{ background: C.surface, borderRadius: '16px', padding: '16px', border: `1px solid ${C.border}` }}>
+                    {selectedOrder.customerLocation ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                           <div style={{ width: '36px', height: '36px', background: `${C.blue}18`, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.blue }}><MapPin size={18}/></div>
+                           <div>
+                             <p style={{ margin: 0, fontSize: '12px', color: C.sub }}>Coordenadas exactas</p>
+                             <p style={{ margin: 0, fontSize: '13px', fontWeight: 700 }}>{selectedOrder.customerLocation.lat.toFixed(6)}, {selectedOrder.customerLocation.lng.toFixed(6)}</p>
+                           </div>
+                        </div>
+                        <a 
+                          href={`https://www.google.com/maps?q=${selectedOrder.customerLocation.lat},${selectedOrder.customerLocation.lng}`}
+                          target="_blank" rel="noreferrer"
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', padding: '10px', background: `${C.blue}20`, border: `1px solid ${C.blue}40`, borderRadius: '10px', color: 'white', textDecoration: 'none', fontSize: '12px', fontWeight: 800 }}
+                        >
+                          Ver en Google Maps <ArrowUpRight size={14}/>
+                        </a>
+                      </div>
+                    ) : (
+                      <p style={{ margin: 0, fontSize: '12px', color: C.sub, textAlign: 'center' }}>Sin coordenadas geográficas</p>
+                    )}
+                  </div>
+
+                  {/* Driver Info */}
+                  {selectedOrder.driverId && (
+                    <div style={{ marginTop: '24px', padding: '16px', background: `${C.purple}12`, borderRadius: '16px', border: `1px solid ${C.purple}20` }}>
+                      <p style={{ margin: '0 0 4px', fontSize: '10px', color: C.purple, fontWeight: 800, textTransform: 'uppercase' }}>Repartidor Asignado</p>
+                      <p style={{ margin: 0, fontWeight: 800, fontSize: '14px' }}>{selectedOrder.driverName || 'Driver'}</p>
+                      {selectedOrder.driverPhone && <p style={{ margin: '2px 0 0', fontSize: '12px', color: C.sub }}>{selectedOrder.driverPhone} <Phone size={10} style={{ marginLeft: '4px' }}/></p>}
+                    </div>
+                  )}
+
+                </div>
               </div>
             </motion.div>
           </motion.div>

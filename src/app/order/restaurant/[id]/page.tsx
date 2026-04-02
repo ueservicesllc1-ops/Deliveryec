@@ -4,9 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Star, Clock, Bike, ChevronLeft, Plus, 
-  Minus, Info, ShoppingBag, 
-  Loader2, Share2, Heart,
-  UtensilsCrossed, ChevronRight,
+  Info, ShoppingBag, Loader2, Share2, Heart,
+  UtensilsCrossed
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
@@ -58,7 +57,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       }
     });
 
-    // Listen to products from the products collection for this businessId
     const qProducts = query(collection(db, 'products'), where('businessId', '==', id));
     const unsubProducts = onSnapshot(qProducts, (snap) => {
       if (!snap.empty) {
@@ -95,47 +93,22 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   }
 
   return (
-    <div style={{
-      width: '100%',
-      minHeight: '100dvh',
-      background: '#F8F9FA',
-      fontFamily: 'Inter, -apple-system, sans-serif',
-      display: 'flex',
-      flexDirection: 'column',
-      position: 'relative',
-    }}>
-      <div style={{
-        maxWidth: '1280px',
-        margin: '0 auto',
-        width: '100%',
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
+    <div className="w-full min-h-[100dvh] bg-gray-50 font-sans flex flex-col relative overflow-x-hidden">
+      <div className="max-w-7xl mx-auto w-full flex-1 flex flex-col relative">
       
       {/* ── TOP NAV (Over Cover) ── */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 10,
-        padding: '16px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
+      <div className="absolute top-0 left-0 right-0 z-20 px-5 py-4 flex items-center justify-between pointer-events-none">
         <button 
           onClick={() => router.back()}
-          style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.25)', backdropFilter: 'blur(12px)', border: 'none', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', cursor: 'pointer' }}
+          className="w-10 h-10 bg-white/20 backdrop-blur-md border-none rounded-xl flex items-center justify-center text-white cursor-pointer pointer-events-auto hover:bg-white/30 transition-colors"
         >
           <ChevronLeft size={20} strokeWidth={2.5}/>
         </button>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <button style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.25)', backdropFilter: 'blur(12px)', border: 'none', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', cursor: 'pointer' }}>
+        <div className="flex gap-2.5 items-center pointer-events-auto">
+          <button className="w-10 h-10 bg-white/20 backdrop-blur-md border-none rounded-xl flex items-center justify-center text-white cursor-pointer hover:bg-white/30 transition-colors">
             <Heart size={20} strokeWidth={2.5}/>
           </button>
-          <button style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.25)', backdropFilter: 'blur(12px)', border: 'none', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', cursor: 'pointer' }}>
+          <button className="w-10 h-10 bg-white/20 backdrop-blur-md border-none rounded-xl flex items-center justify-center text-white cursor-pointer hover:bg-white/30 transition-colors">
             <Share2 size={20} strokeWidth={2.5}/>
           </button>
           
@@ -143,24 +116,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           {cart.length > 0 && (
             <motion.button 
               initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: cartBounce ? 1.2 : 1, opacity: 1 }}
+              animate={{ scale: cartBounce ? 1.1 : 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 400, damping: 15 }}
               onClick={goToCheckout}
-              style={{
-                height: '40px', 
-                padding: '0 16px',
-                background: '#FF5722', 
-                borderRadius: '12px', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px',
-                color: 'white',
-                cursor: 'pointer',
-                fontWeight: 800,
-                fontSize: '13px',
-                boxShadow: cartBounce ? '0 6px 25px rgba(255,87,34,0.7)' : '0 4px 15px rgba(255,87,34,0.4)',
-                border: '1.5px solid rgba(255,255,255,0.3)'
-              }}
+              className="h-10 px-4 bg-orange-500 rounded-xl flex items-center gap-2 text-white cursor-pointer font-extrabold text-[13px] border-[1.5px] border-white/30 hover:bg-orange-600 outline-none"
+              style={{ boxShadow: cartBounce ? '0 6px 25px rgba(255,87,34,0.7)' : '0 4px 15px rgba(255,87,34,0.4)' }}
             >
               <ShoppingBag size={18} strokeWidth={2.5} />
               <span>{cartCount}</span>
@@ -170,29 +130,29 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       </div>
 
       {/* ── RESTAURANT COVER ── */}
-      <div style={{ position: 'relative', height: '320px', overflow: 'hidden' }}>
+      <div className="relative h-[320px] overflow-hidden bg-gray-900">
         <img 
           src={restaurant?.image || "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?q=80&w=1600&auto=format&fit=crop"} 
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          className="w-full h-full object-cover opacity-80"
           alt={restaurant?.name || "Restaurant Cover"}
         />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.8))' }} />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/30 to-black/90 pointer-events-none" />
         
-        <div style={{ position: 'absolute', bottom: '32px', left: '32px', right: '32px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '20px' }}>
-            <div style={{ width: '100px', height: '100px', background: 'white', borderRadius: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FF5722', boxShadow: '0 12px 40px rgba(0,0,0,0.3)', flexShrink: 0 }}>
+        <div className="absolute bottom-8 left-8 right-8">
+          <div className="flex items-end gap-5">
+            <div className="w-[100px] h-[100px] bg-white rounded-3xl flex items-center justify-center text-orange-500 shadow-[0_12px_40px_rgba(0,0,0,0.3)] shrink-0">
               <UtensilsCrossed size={48} />
             </div>
-            <div style={{ paddingBottom: '8px' }}>
-              <h1 style={{ margin: '0 0 8px', fontSize: '40px', fontWeight: 900, color: 'white', letterSpacing: '-1.5px', lineHeight: 1 }}>{restaurant?.name || 'Cargando...'}</h1>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'white', padding: '4px 10px', borderRadius: '10px' }}>
-                  <Star size={14} fill="#FF5722" stroke="#FF5722" />
-                  <span style={{ fontSize: '13px', fontWeight: 900, color: '#111' }}>{restaurant?.rating || '0.0'}</span>
+            <div className="pb-2">
+              <h1 className="m-0 mb-2 text-[40px] font-black text-white tracking-[-1.5px] leading-none drop-shadow-md">{restaurant?.name || 'Cargando...'}</h1>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-xl shadow-sm">
+                  <Star size={14} fill="#FF5722" className="text-orange-500" />
+                  <span className="text-[13px] font-black text-gray-900">{restaurant?.rating || '0.0'}</span>
                 </div>
-                <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', fontWeight: 700 }}>{restaurant?.reviews || 0}+ reseñas</span>
-                <span style={{ color: 'rgba(255,255,255,0.4)' }}>•</span>
-                <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', fontWeight: 700 }}>{restaurant?.category}</span>
+                <span className="text-[13px] text-white/90 font-bold drop-shadow-sm">{restaurant?.reviews || 0}+ reseñas</span>
+                <span className="text-white/40">•</span>
+                <span className="text-[13px] text-white/90 font-bold drop-shadow-sm">{restaurant?.category}</span>
               </div>
             </div>
           </div>
@@ -200,67 +160,50 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       </div>
 
       {/* ── INFO BAR ── */}
-      <div style={{ padding: '0 32px', marginTop: '-32px', position: 'relative', zIndex: 11 }}>
+      <div className="px-5 md:px-8 -mt-8 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-           <div style={{ background: 'white', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '40px', height: '40px', background: '#F0F9FF', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0369A1' }}>
+           <div className="bg-white rounded-3xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.04)] flex items-center gap-4">
+              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
                 <Clock size={20} />
               </div>
               <div>
-                <p style={{ margin: 0, fontSize: '10px', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tiempo Estimado</p>
-                <p style={{ margin: 0, fontSize: '15px', fontWeight: 900, color: '#1E293B' }}>{restaurant?.time || '30-45 min'}</p>
+                <p className="m-0 text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">Tiempo Estimado</p>
+                <p className="m-0 text-[15px] font-black text-gray-800">{restaurant?.time || '30-45 min'}</p>
               </div>
            </div>
-           <div style={{ background: 'white', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '40px', height: '40px', background: '#F0FDF4', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#15803D' }}>
+           <div className="bg-white rounded-3xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.04)] flex items-center gap-4">
+              <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-green-600">
                 <Bike size={20} />
               </div>
               <div>
-                <p style={{ margin: 0, fontSize: '10px', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Costo de Envío</p>
-                <p style={{ margin: 0, fontSize: '15px', fontWeight: 900, color: '#1E293B' }}>{restaurant?.delivery === 0 ? '¡GRATIS!' : `$${restaurant?.delivery?.toFixed(2)}`}</p>
+                <p className="m-0 text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">Costo de Envío</p>
+                <p className="m-0 text-[15px] font-black text-gray-800">{restaurant?.delivery === 0 ? '¡GRATIS!' : `$${restaurant?.delivery?.toFixed(2)}`}</p>
               </div>
            </div>
-           <div style={{ background: 'white', borderRadius: '24px', padding: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '40px', height: '40px', background: '#FFF7ED', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C2410C' }}>
+           <div className="bg-white rounded-3xl p-5 shadow-[0_4px_20px_rgba(0,0,0,0.04)] flex items-center gap-4">
+              <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center text-orange-600">
                 <Info size={20} />
               </div>
               <div>
-                <p style={{ margin: 0, fontSize: '10px', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Información</p>
-                <p style={{ margin: 0, fontSize: '15px', fontWeight: 900, color: '#1E293B' }}>Vendido por {restaurant?.name}</p>
+                <p className="m-0 text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">Información</p>
+                <p className="m-0 text-[15px] font-black text-gray-800 line-clamp-1">Vendido por {restaurant?.name}</p>
               </div>
            </div>
         </div>
       </div>
 
       {/* ── CATEGORY BAR ── */}
-      <div style={{ 
-        position: 'sticky', 
-        top: '0px', 
-        zIndex: 30, 
-        background: 'rgba(248,249,250,0.9)', 
-        backdropFilter: 'blur(16px)',
-        padding: '24px 0 16px',
-        marginTop: '24px'
-      }}>
-        <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', padding: '0 32px', scrollbarWidth: 'none' }}>
+      <div className="sticky top-0 z-30 bg-gray-50/90 backdrop-blur-xl py-4 mt-6 border-b border-gray-100">
+        <div className="flex gap-3 overflow-x-auto px-5 md:px-8 no-scrollbar">
           {menuCategories.map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
-              style={{
-                flexShrink: 0,
-                padding: '12px 24px',
-                borderRadius: '16px',
-                border: activeCategory === cat ? 'none' : '2px solid #E5E7EB',
-                background: activeCategory === cat ? '#FF5722' : 'white',
-                color: activeCategory === cat ? 'white' : '#4B5563',
-                fontSize: '13px',
-                fontWeight: 800,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                textTransform: 'uppercase',
-                letterSpacing: '0.02em'
-              }}
+              className={`shrink-0 px-6 py-3 rounded-2xl text-[13px] font-extrabold cursor-pointer transition-all uppercase tracking-[0.02em] ${
+                activeCategory === cat 
+                  ? 'bg-orange-500 text-white border-2 border-orange-500 shadow-md shadow-orange-500/20' 
+                  : 'bg-white text-gray-600 border-2 border-gray-200 hover:border-gray-300'
+              }`}
             >
               {cat}
             </button>
@@ -269,65 +212,49 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       </div>
 
       {/* ── MENU ITEMS ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" style={{ padding: '32px', paddingBottom: '140px' }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative px-5 md:px-8 py-8 pb-[140px]">
         {menuItems.filter((item: any) => item.category === activeCategory || activeCategory === 'All').map((item: any, i: number) => (
           <motion.div
             key={item.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            style={{
-              background: 'white',
-              borderRadius: '32px',
-              padding: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-              border: '1px solid #F1F5F9',
-              position: 'relative',
-              overflow: 'hidden'
-            }}
+            className="bg-white rounded-[32px] p-4 flex flex-col gap-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100 group hover:border-gray-200 transition-colors"
           >
-            <div style={{ height: '200px', borderRadius: '24px', overflow: 'hidden', position: 'relative' }}>
-              <img src={item.image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={item.name} />
-              <div style={{ position: 'absolute', top: 12, right: 12, background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)', padding: '6px 12px', borderRadius: '12px', fontSize: '15px', fontWeight: 900, color: '#111' }}>
+            <div className="h-[200px] rounded-[24px] overflow-hidden relative bg-gray-100">
+              <img src={item.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={item.name} />
+              <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl text-[15px] font-black text-gray-900 shadow-sm border border-white/20">
                 ${item.price.toFixed(2)}
               </div>
             </div>
-            <div>
-              <h5 style={{ margin: '0 0 6px', fontSize: '18px', fontWeight: 900, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '-0.5px' }}>{item.name}</h5>
-              <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748B', lineHeight: 1.5, fontWeight: 500 }}>{item.description}</p>
+            <div className="flex flex-col flex-1">
+              <h5 className="m-0 mb-1.5 text-lg font-black text-gray-800 uppercase tracking-[-0.5px] leading-tight">{item.name}</h5>
+              <p className="m-0 mb-5 text-[13px] text-gray-500 leading-relaxed font-medium line-clamp-2 flex-1">{item.description}</p>
               
               <motion.button 
                 onClick={() => handleAddToCart(item)}
                 animate={addedId === item.id ? { scale: [1, 0.95, 1] } : { scale: 1 }}
                 transition={{ duration: 0.2 }}
-                style={{ 
-                  width: '100%', 
-                  padding: '14px', 
-                  background: addedId === item.id ? '#22C55E' : '#F8F9FA', 
-                  border: addedId === item.id ? '2px solid #22C55E' : '2px solid #F1F5F9', 
-                  borderRadius: '16px', 
-                  color: addedId === item.id ? 'white' : '#1E293B', 
-                  cursor: 'pointer', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  gap: '12px',
-                  fontWeight: 800,
-                  fontSize: '13px',
-                  transition: 'background 0.3s, border 0.3s, color 0.3s',
-                  boxShadow: addedId === item.id ? '0 4px 15px rgba(34,197,94,0.35)' : 'none'
-                }}
+                className={`w-full p-3.5 rounded-2xl flex items-center justify-center gap-3 font-extrabold text-[13px] transition-all duration-300 outline-none
+                  ${addedId === item.id 
+                    ? 'bg-green-500 border-2 border-green-500 text-white shadow-[0_4px_15px_rgba(34,197,94,0.35)]' 
+                    : 'bg-gray-50 border-2 border-gray-100 text-gray-800 hover:border-orange-500 hover:bg-orange-50 hover:text-orange-600'
+                  }`}
               >
                 {addedId === item.id 
-                  ? <><span style={{ fontSize: '16px' }}>✓</span> ¡AGREGADO!</>
-                  : <><Plus size={18} strokeWidth={3} style={{ color: '#FF5722' }} /> AGREGAR AL CARRITO</>}
+                  ? <><span className="text-[16px] leading-none">✓</span> ¡AGREGADO!</>
+                  : <><Plus size={18} strokeWidth={3} className="text-orange-500 group-hover:scale-110 transition-transform" /> AGREGAR AL CARRITO</>}
               </motion.button>
             </div>
           </motion.div>
         ))}
+        {menuItems.filter((i) => i.category === activeCategory || activeCategory === 'All').length === 0 && (
+          <div className="col-span-full py-10 flex flex-col items-center justify-center text-center opacity-50">
+            <UtensilsCrossed size={40} className="mb-4 text-gray-400" />
+            <h3 className="text-lg font-bold text-gray-700">Sin productos disponibles</h3>
+            <p className="text-sm text-gray-500">Pronto agregaremos más platillos deliciosos.</p>
+          </div>
+        )}
       </div>
 
       {/* ── FLOATING CART ACTION (Mobile) ── */}
@@ -337,16 +264,16 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             initial={{ y: 100 }}
             animate={{ y: 0 }}
             exit={{ y: 100 }}
-            className="md:hidden fixed bottom-[24px] left-[24px] right-[24px] h-[64px] bg-[#111] rounded-[24px] flex items-center justify-between px-[24px] text-white shadow-2xl cursor-pointer z-[60]"
+            className="md:hidden fixed bottom-6 left-6 right-6 h-16 bg-gray-900 rounded-[28px] flex items-center justify-between px-6 text-white shadow-2xl cursor-pointer z-[60] active:scale-95 transition-transform"
             onClick={goToCheckout}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-               <div style={{ width: '32px', height: '32px', background: '#FF5722', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '14px' }}>
+            <div className="flex items-center gap-4">
+               <div className="w-8 h-8 bg-orange-500 rounded-xl flex items-center justify-center font-black text-sm">
                  {cartCount}
                </div>
-               <span style={{ fontWeight: 800, fontSize: '15px', letterSpacing: '-0.3px', textTransform: 'uppercase' }}>Ir a Pagar</span>
+               <span className="font-extrabold text-[15px] tracking-tight uppercase">Ir a Pagar</span>
             </div>
-            <span style={{ fontWeight: 900, fontSize: '18px' }}>${subtotal.toFixed(2)}</span>
+            <span className="font-black text-lg">${subtotal.toFixed(2)}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -354,9 +281,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       </div>
       
       <style>{`
-        ::-webkit-scrollbar { display: none; }
-        .animate-spin { animation: spin 1s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
   );

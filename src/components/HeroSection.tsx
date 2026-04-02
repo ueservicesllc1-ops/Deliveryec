@@ -65,7 +65,7 @@ export default function HeroSection() {
     <section id="hero" style={{
       background: '#111111',
       paddingTop: '64px',
-      minHeight: '580px',
+      minHeight: '680px',
       position: 'relative',
       overflow: 'hidden',
     }}>
@@ -156,14 +156,14 @@ export default function HeroSection() {
       <div style={{
         maxWidth: '1280px',
         margin: '0 auto',
-        padding: '0 40px',
+        padding: '0 24px',
         position: 'relative',
         zIndex: 3,
         display: 'flex',
         alignItems: 'center',
-        minHeight: '516px',
+        minHeight: '616px',
       }}>
-        <div style={{ maxWidth: '530px', paddingTop: '48px', paddingBottom: '72px' }}>
+        <div style={{ maxWidth: '680px', paddingTop: '48px', paddingBottom: '72px', marginLeft: '-200px' }}>
 
           {/* Badge */}
           <motion.div
@@ -180,7 +180,7 @@ export default function HeroSection() {
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.08 }}
             style={{
               fontFamily: 'Outfit, sans-serif',
-              fontSize: 'clamp(40px, 5.5vw, 68px)',
+              fontSize: 'clamp(48px, 6.5vw, 84px)',
               fontWeight: 900,
               lineHeight: 1.05,
               letterSpacing: '-2.5px',
@@ -200,7 +200,7 @@ export default function HeroSection() {
 
           <motion.p
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.4 }}
-            style={{ fontSize: '16px', color: 'rgba(255,255,255,0.5)', marginBottom: '32px', lineHeight: 1.65 }}>
+            style={{ fontSize: '18px', color: 'rgba(255,255,255,0.5)', marginBottom: '32px', lineHeight: 1.65 }}>
             Pide en minutos. Recibe en la puerta de tu casa.
           </motion.p>
 
